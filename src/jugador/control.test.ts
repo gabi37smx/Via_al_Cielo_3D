@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config.ts';
 import { PASO } from '../nucleo/bucle.ts';
-import { RADIO_COLUMNA, SEPARACION_MAX } from '../reglas/torre.ts';
+import { RADIO_PARED, SEPARACION_MAX } from '../reglas/torre.ts';
 import { crearEscalador, pasoEscalador, type Escalador, type Ordenes, type Suelo } from './control.ts';
 
 const C = CONFIG.escalador;
@@ -9,8 +9,8 @@ const QUIETO: Ordenes = { moverX: 0, moverY: 0, saltar: false, giroCamara: 0 };
 /** Suelo plano a 0 m en todo el mundo. */
 const PLANO: Suelo = (_x, _z, techo) => (techo >= 0 ? 0 : -Infinity);
 
-/** Lejos de la columna para que no estorbe. */
-const nuevo = () => crearEscalador(10, 0, 0);
+/** En el centro del pozo, lejos de la pared para que no estorbe. */
+const nuevo = () => crearEscalador(0, 0, 0);
 
 function pasos(e: Escalador, n: number, o: Ordenes = QUIETO, suelo: Suelo = PLANO) {
   for (let i = 0; i < n; i++) pasoEscalador(e, o, suelo, PASO);
@@ -151,9 +151,17 @@ describe('carrera', () => {
     expect(Math.abs(e.vz)).toBeLessThan(1e-9);
   });
 
-  it('no se mete en la columna: se desliza por su borde', () => {
-    const e = crearEscalador(RADIO_COLUMNA + 2, 0, 0);
-    pasos(e, 120, { ...QUIETO, moverY: 1, giroCamara: Math.PI / 2 }); // hacia −x, contra la columna
-    expect(Math.hypot(e.x, e.z)).toBeGreaterThanOrEqual(RADIO_COLUMNA + C.radio - 1e-9);
+  it('no se mete en la pared del pozo', () => {
+    const e = crearEscalador(RADIO_PARED - 2, 0, 0);
+    pasos(e, 120, { ...QUIETO, moverY: 1, giroCamara: -Math.PI / 2 }); // hacia +x, contra la pared
+    expect(Math.hypot(e.x, e.z)).toBeLessThanOrEqual(RADIO_PARED - C.radio + 1e-9);
+  });
+
+  it('corriendo de lado junto a la pared, se desliza por ella sin pararse', () => {
+    const e = crearEscalador(RADIO_PARED - 1, 0, 0);
+    // Cámara hacia el centro (giro −π/2 en x > 0) y en diagonal: adelante (contra la pared) y a la derecha.
+    pasos(e, 60, { ...QUIETO, moverY: 1, moverX: 1, giroCamara: -Math.PI / 2 });
+    expect(Math.hypot(e.x, e.z)).toBeLessThanOrEqual(RADIO_PARED - C.radio + 1e-9);
+    expect(Math.hypot(e.vx, e.vz)).toBeGreaterThan(2);
   });
 });

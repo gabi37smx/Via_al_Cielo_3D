@@ -8,7 +8,7 @@
  *  - rugosidad:  las partes hundidas brillan menos que las salientes
  *
  * El ruido es PERIÓDICO: el borde derecho continúa en el izquierdo, así la
- * textura se repite sobre la columna sin costuras.
+ * textura se repite sobre la pared sin costuras.
  */
 import * as THREE from 'three';
 import { crearAzar } from '../reglas/azar.ts';

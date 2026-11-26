@@ -9,7 +9,7 @@
  * (90 fotogramas) tras un golpe.
  */
 import { crearAzar, derivarSemilla, entre } from './azar.ts';
-import { RADIO_COLUMNA, RADIO_RELLANO, type Tramo } from './torre.ts';
+import { RADIO_PARED, puntoEnAngulo, type Tramo } from './torre.ts';
 
 export const REGLAS = {
   vidaInicial: 100,
@@ -21,11 +21,12 @@ export const REGLAS = {
   danioMurcielago: 10,
   invulnerabilidad: 1.5,
   /**
-   * Murciélagos en el tramo de la cueva: 25, como el 2D. Simulando 50 torres,
-   * el escalador del ordenador (que no esquiva) recibe ~2 golpes por subida:
-   * un primer tramo suave. Con 12 era ~0,6.
+   * Murciélagos en el tramo de la cueva. El 2D tenía 25, pero la pared del
+   * pozo (12 m de radio) da 2,4 veces más vuelta que la columna: con 25 el
+   * escalador del ordenador (que no esquiva) recibía 0,7 golpes por subida.
+   * Con 40 vuelve a ~2 (200 torres simuladas): un primer tramo suave.
    */
-  murcielagosCueva: 25,
+  murcielagosCueva: 40,
   /** Distancia (m) al centro del cuerpo para coger un fragmento. */
   radioRecoger: 1.1,
   /** Distancia (m) entre el murciélago y el centro del cuerpo para que golpee. */
@@ -48,7 +49,7 @@ export interface Murcielago {
   id: number;
   /** Altura media de vuelo (m). */
   y: number;
-  /** Radio de su vuelta alrededor de la columna (m). */
+  /** Radio de su vuelta alrededor del pozo (m). */
   radio: number;
   fase: number;
   /** Velocidad angular (rad/s); el signo es el sentido. */
@@ -72,33 +73,33 @@ export function generarFragmentos(semilla: number, tramo: Tramo): Fragmento[] {
     const candidatos = tramo.salientes.filter((s) => s.y > desde + 5 && s.y < hasta);
     if (candidatos.length === 0) continue;
     const s = candidatos[Math.floor(azar() * candidatos.length)]!;
-    const r = RADIO_COLUMNA + 1.4;
     fragmentos.push({
       id: tramo.indice * 10 + i,
-      x: Math.cos(s.angulo) * r,
+      ...puntoEnAngulo(s.angulo, RADIO_PARED - 0.8),
       y: s.y + 1.2,
-      z: Math.sin(s.angulo) * r,
     });
   }
   return fragmentos;
 }
 
-/** Murciélagos dando vueltas a la torre, repartidos por la altura del tramo. */
+/** Murciélagos dando vueltas al pozo pegados a la pared, repartidos por la altura del tramo. */
 export function generarMurcielagos(semilla: number, tramo: Tramo, cantidad: number): Murcielago[] {
   const azar = crearAzar(derivarSemilla(semilla, 2000 + tramo.indice));
   const desde = tramo.base + 12; // el suelo de salida, tranquilo
   const hasta = tramo.rellano - 6;
-  return Array.from({ length: cantidad }, (_, i) => ({
-    id: tramo.indice * 100 + i,
+  return Array.from({ length: cantidad }, (_, i) => {
     // Repartidos a lo alto (una franja cada uno) para que no se amontonen.
-    y: desde + ((hasta - desde) * (i + azar())) / cantidad,
-    // Vuelan justo por encima de los salientes, por donde pasa el escalador.
-    // (Con 4-6,4 m pasaban por fuera y casi nunca tocaban: 0,2 golpes por subida.)
-    radio: entre(azar, RADIO_COLUMNA + 0.6, RADIO_RELLANO),
-    fase: azar() * Math.PI * 2,
-    velocidad: entre(azar, 0.35, 0.7) * (azar() < 0.5 ? -1 : 1),
-    vaiven: entre(azar, 0.3, 0.9),
-  }));
+    const y = desde + ((hasta - desde) * (i + azar())) / cantidad;
+    // Vuelan pegados a la pared, por donde pasa el escalador (que pisa el
+    // saliente a ~1 m de la roca). Si pasan lejos casi nunca tocan.
+    const radio = entre(azar, RADIO_PARED - 1.6, RADIO_PARED - 0.4);
+    const fase = azar() * Math.PI * 2;
+    // Se elige la rapidez en m/s y se pasa a vueltas: a 11 m del eje, los
+    // rad/s de la columna (a 4 m) les hacían ir al triple.
+    const rapidez = entre(azar, 2, 4);
+    const sentido = azar() < 0.5 ? -1 : 1;
+    return { id: tramo.indice * 100 + i, y, radio, fase, velocidad: (sentido * rapidez) / radio, vaiven: entre(azar, 0.3, 0.9) };
+  });
 }
 
 export function posicionMurcielago(m: Murcielago, tiempo: number): Punto {

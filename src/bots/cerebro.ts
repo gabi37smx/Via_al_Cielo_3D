@@ -9,7 +9,7 @@
  * cuando está a tiro y usar el doble salto si se queda corto.
  */
 import type { Escalador, Ordenes } from '../jugador/control.ts';
-import { RADIO_RELLANO, type Tramo } from '../reglas/torre.ts';
+import { RADIO_PARED, puntoEnAngulo, type Tramo } from '../reglas/torre.ts';
 
 /** Distancia horizontal (m) a la que salta hacia el siguiente saliente. */
 const DISTANCIA_SALTO = 2.6;
@@ -29,13 +29,11 @@ export interface Objetivo {
 export function siguienteObjetivo(e: Escalador, tramo: Tramo, apoyo: number): Objetivo {
   const s = tramo.salientes.find((x) => x.y > apoyo + 0.3);
   if (s) {
-    // Centro del saliente, un poco hacia la columna (más margen al caer).
-    const r = RADIO_RELLANO - 1.3;
-    return { x: Math.cos(s.angulo) * r, y: s.y, z: Math.sin(s.angulo) * r };
+    // Centro del saliente, un poco hacia la pared (más margen al caer).
+    return { ...puntoEnAngulo(s.angulo, RADIO_PARED - 0.9), y: s.y };
   }
-  // El rellano es un anillo: el punto del anillo a la altura y el lado donde está.
-  const a = Math.atan2(e.z, e.x);
-  return { x: Math.cos(a) * (RADIO_RELLANO - 1), y: tramo.rellano, z: Math.sin(a) * (RADIO_RELLANO - 1) };
+  // El rellano da la vuelta entera a la pared: el punto que tiene delante.
+  return { ...puntoEnAngulo(Math.atan2(e.z, e.x), RADIO_PARED - 1), y: tramo.rellano };
 }
 
 export interface Cerebro {
