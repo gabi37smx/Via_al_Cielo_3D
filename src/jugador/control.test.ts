@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config.ts';
 import { PASO } from '../nucleo/bucle.ts';
-import { RADIO_PARED, SEPARACION_MAX } from '../reglas/torre.ts';
+import { RADIO_PARED, TIPOS } from '../reglas/torre.ts';
 import { crearEscalador, pasoEscalador, type Escalador, type Ordenes, type Suelo } from './control.ts';
 
 const C = CONFIG.escalador;
@@ -37,7 +37,7 @@ describe('salto', () => {
     const h = alturaDeSalto(false);
     expect(h).toBeGreaterThan(3.3);
     expect(h).toBeLessThan(3.6);
-    expect(h).toBeGreaterThan(SEPARACION_MAX + 0.25);
+    expect(h).toBeGreaterThan(TIPOS.normal.subida[1] + 0.25);
   });
 
   it('el doble salto añade unos 2 m más', () => {

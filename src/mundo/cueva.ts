@@ -11,7 +11,7 @@
  */
 import * as THREE from 'three';
 import { crearAzar, entre } from '../reglas/azar.ts';
-import { GROSOR_SALIENTE, METROS_POR_TRAMO, RADIO_PARED, sobreSaliente, type Tramo } from '../reglas/torre.ts';
+import { METROS_POR_TRAMO, RADIO_PARED, sobreSaliente, type Tramo } from '../reglas/torre.ts';
 import { materialRoca, type TexturaRoca } from './texturas.ts';
 
 export const RADIO_CUEVA = RADIO_PARED;
@@ -70,7 +70,7 @@ export function crearCueva(escena: THREE.Scene, roca: TexturaRoca, tramo: Tramo)
     const radio = RADIO_CUEVA - entre(azar, 0.2, 0.8);
     posicion.set(Math.cos(angulo) * radio, entre(azar, 0.5, METROS_POR_TRAMO), Math.sin(angulo) * radio);
     const estorba = tramo.salientes.some(
-      (s) => posicion.y > s.y - GROSOR_SALIENTE - 1 && posicion.y < s.y + 2.2 && sobreSaliente(s, posicion.x, posicion.z, 0.5),
+      (s) => posicion.y > s.y - s.grosor - 1 && posicion.y < s.y + 2.2 && sobreSaliente(s, posicion.x, posicion.z, 0.5),
     );
     if (estorba) continue;
     giro.setFromEuler(euler.set(azar() * Math.PI, azar() * Math.PI, azar() * Math.PI));
