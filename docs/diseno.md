@@ -114,6 +114,8 @@ Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y 
 - **007** · La red va con **Supabase** (profesor, 26-nov).
 - **008** · Se publica en el **servidor del centro** (profesor, 26-nov).
 - **009** · Vale OpenCode o Claude Code; se usa **Claude Code** y el `AGENTS.md` sirve para los dos.
+- **010** · Pruebas con **Vitest** y captura con **Playwright** (Chromium sin pantalla, SwiftShader si no hay tarjeta gráfica). La captura arranca su propio Vite para no depender de tener `npm run dev` abierto.
+- **011** · `base: './'` en `vite.config.ts`: el juego vivirá en una subcarpeta del servidor del centro.
 
 ## Pendiente
 
