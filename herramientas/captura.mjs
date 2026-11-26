@@ -14,6 +14,7 @@
  * `--teclas` pulsa teclas antes de la captura (código:milisegundos, en orden),
  * para ver el juego en movimiento: un salto, una carrera… `_:300` espera
  * 300 ms sin pulsar nada (p. ej. doble salto: "Space:60,_:300,Space:60").
+ * `--js "juego.danar(80)"` ejecuta código en la página antes de las teclas.
  *
  * Arranca su propio servidor de Vite en un puerto libre (no hace falta tener
  * `npm run dev` abierto), espera a que el juego avise de que ya ha pintado
@@ -41,6 +42,7 @@ const { values: op } = parseArgs({
     espera: { type: 'string', default: '500' },
     ruta: { type: 'string', default: '?semilla=1&panel=1' },
     teclas: { type: 'string', default: '' },
+    js: { type: 'string', default: '' },
   },
 });
 
@@ -76,6 +78,7 @@ try {
 
   await pagina.goto(new URL(op.ruta, url).href);
   await pagina.waitForSelector('body[data-listo]', { timeout: 15000 });
+  if (op.js) await pagina.evaluate(op.js);
   for (const par of op.teclas.split(',').filter(Boolean)) {
     const [tecla, ms = '100'] = par.trim().split(':');
     if (tecla === '_') {

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "comprobar": "tsc",
     "test": "vitest run",
-    "captura": "node herramientas/captura.mjs"
+    "captura": "node herramientas/captura.mjs",
+    "simular": "node herramientas/simular.ts"
   },
   "dependencies": {
     "three": "^0.187.0"
