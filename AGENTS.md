@@ -7,7 +7,8 @@ Todo en **español**: código (variables, funciones, archivos), comentarios, com
 ## El stack
 
 - **Vite** sirve y compila. **TypeScript** estricto (`strict: true`). **Three.js** dibuja.
-- **Rapier** (físicas) y **Supabase Realtime** (red de la carrera) llegarán en sus sesiones; no se añaden antes.
+- **Supabase Realtime** (red de la carrera) llega en la sesión 5; no se añade antes.
+- **Sin Rapier** de momento (decisión 019): el suelo y las colisiones son lógica propia en `src/reglas/torre.ts` y `src/jugador/control.ts`.
 - **Vitest** para las pruebas de la lógica y **Playwright** (Chromium sin pantalla) para la captura.
 - Sin motor de juego ni framework de interfaz (nada de React, Babylon.js, etc.).
 - 1 unidad de Three.js = 1 metro.
@@ -20,7 +21,8 @@ src/
   config.ts  TODOS los números que se ajustan jugando (velocidades, saltos, cámara…)
   nucleo/    bucle de paso fijo, entrada (teclado/ratón/mando → una misma estructura)
   jugador/   control.ts (movimiento, LÓGICA PURA) y personaje.ts (dibujo y animación)
-  reglas/    vida, fragmentos, tramos, carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
+  reglas/    torre, partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
+  bots/      cerebro del escalador del ordenador y simulación de partidas (lógica pura)
   mundo/     escena, luces, cámara, torre, escenarios (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
   red/       salas, mensajes, interpolación (Supabase)
@@ -43,10 +45,12 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm test` | Pasar las pruebas |
 | `npm run build` | Comprobar tipos y generar `dist/` para publicar |
 | `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms), `--ruta` (por defecto `"?semilla=1&panel=1"`) y `--teclas` (pulsar antes de capturar: `"Space:60,_:400,Space:60"` = doble salto; `_` espera) |
+| `npm run simular` | Simula subidas de la cueva con el escalador del ordenador y enseña una tabla (`npm run simular -- 50 20`: 50 torres, 20 murciélagos). **Después de tocar números de `config.ts` o `REGLAS`, simula** |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |
 
 Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (empieza en el primer saliente desde esa altura), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla, altura y postura).
 
+- En la consola del navegador (y en la captura con `--js "…"`) está `juego`: `juego.partida`, `juego.escalador`, `juego.danar(50)`.
 - Las pulsaciones (saltar) solo valen en el paso en que se leen; los números van a `src/config.ts`, nunca sueltos por el código.
 - SwiftShader (la captura) va a 5-10 fps: el juego va «a cámara lenta» porque el bucle no recupera más de 5 pasos por fotograma. No sirve para medir rendimiento. Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png`.
 

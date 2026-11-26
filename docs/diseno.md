@@ -53,12 +53,14 @@ Igual que el original: subir lo más alto posible. Vida a 0 → fin de partida �
 | Final de cada tramo | — | rellano: anillo completo alrededor de la columna |
 | Caída que hace daño | > 90 m → −30 % | igual |
 | Daño de animales | 10-20 % | igual (murciélago 10, águila 15…) |
+| Murciélagos en la cueva | 25 por pantalla | 25 por tramo, dando vueltas por encima de los salientes (~2 golpes por subida simulada) |
+| Fragmentos | 3 por pantalla, +25 % de vida | igual: uno por tercio del tramo, flotando sobre un saliente |
 | Invulnerable tras golpe | 90 fotogramas | 1,5 s |
 | Velocidad máxima creíble | 14 m/s (API) | no superarla o el ranking rechaza la partida |
 
 ## Filtro de alcance
 
-**Hito 1 (sesión 4): «ya es un juego»**, solo modo solo
+**Hito 1 (sesión 4): «ya es un juego»**, solo modo solo · ✅ conseguido el 26-nov
 - Escalador (cápsula) que corre, salta y hace doble salto, con cámara en tercera persona.
 - Torre de salientes generada con semilla, **un escenario: la cueva**.
 - Fragmentos, vida, daño por caída, murciélagos y fin de partida.
@@ -128,8 +130,13 @@ Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y 
 - **016** · El **escalador se construye con piezas por código** (cápsula, casco con linterna, gafas, mochila con cuerda) en vez de cargar un modelo como el robot del curso: es propio, no hay que acreditar nada y está lejos de Minecraft. La animación también es por código y **la decide la postura** (quieto, corriendo, subiendo, cayendo, doble salto), no las teclas: servirá igual para los rivales de la red.
 - **017** · En vez del «suelo imaginario» del curso, el escalador ya **se posa sobre los salientes** con `alturaSuelo` (lógica pura, la misma caja que se dibuja): sin eso no se puede probar una torre. Los salientes son **de un sentido**. Se decide en la sesión 4 si Rapier sigue haciendo falta.
 - **018** · El movimiento (`src/jugador/control.ts`) es lógica pura con pruebas: altura de los saltos, doble salto, coyote, salto guardado, diagonal, frenado y columna.
+- **019** · **Sin Rapier por ahora** (cambia la decisión 001). El mundo son cajas, un cilindro y plataformas de un sentido: el suelo propio lo resuelve en pocas líneas, con pruebas, sin 2 MB de WebAssembly y siendo **idéntico en todos los navegadores** (importante para la carrera). Rapier vuelve si hace falta algo que no sea esto (objetos que rueden, empujones). *Pendiente de comentarlo con el profesor.*
+- **020** · Las reglas de la partida (`src/reglas/partida.ts`) son lógica pura: reciben dónde está el escalador y devuelven **jugadas** (fragmento, vida extra, golpe, caída, fin); el HUD y la pantalla final reaccionan a ellas.
+- **021** · Un **escalador del ordenador** (`src/bots/cerebro.ts`) da las mismas órdenes que el teclado y pasa por el mismo movimiento. Con él se **simula** la cueva (`npm run simular`) y las pruebas vigilan el equilibrio: las 20 torres se suben enteras, a menos de 14 m/s, cogiendo los fragmentos, con 1-4 golpes de murciélago. En la sesión 6 será el rival del ordenador.
+- **022** · El récord se guarda en el navegador (`localStorage`); el ranking mundial llega en la 1.0. «Volver a jugar» repite la misma torre.
 
 ## Pendiente
 
 - **Rúbrica de la sesión 8** (release y defensa): aún no está publicada. La semana que viene el profesor publicará una guía y la rúbrica irá saliendo poco a poco, como en los otros proyectos.
 - **Servidor del centro:** cómo se suben los archivos y qué dirección tendrá el juego.
+- **Rapier:** preguntar al profesor si es obligatorio usar un motor de físicas o vale el suelo propio (decisión 019).

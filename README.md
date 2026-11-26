@@ -34,4 +34,5 @@ Con `?semilla=1234` en la dirección se ve siempre la misma torre, y con `?altur
 |---|---|
 | `npm test` | Pasar las pruebas |
 | `npm run build` | Comprobar tipos y generar `dist/` |
+| `npm run simular` | Simular subidas con el escalador del ordenador (equilibrio) |
 | `npm run captura` | Guardar una captura del juego en `capturas/captura.png` (la primera vez: `npx playwright install chromium`) |
