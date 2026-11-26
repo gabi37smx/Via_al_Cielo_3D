@@ -26,6 +26,7 @@ Y abrir la dirección que sale (normalmente http://localhost:5173).
 | Moverse | WASD o flechas | stick izquierdo |
 | Saltar / doble salto | Espacio (otra vez en el aire) | A |
 | Girar la cámara | ratón (clic para capturarlo, Esc lo suelta) o Q/E | stick derecho |
+| Pantalla completa | F o el botón de abajo a la derecha (Esc sale) | — |
 | Panel de datos | F3 | — |
 
 ### Carrera (2-4 jugadores)

@@ -7,6 +7,7 @@ import { ErrorSala, configuracionRed, unirseASala, type Sala } from './red/sala.
 import { crearRivales } from './mundo/rivales.ts';
 import { crearListaJugadores } from './ui/jugadores.ts';
 import { mostrarMenu, type Eleccion } from './ui/menu.ts';
+import { crearPantallaCompleta } from './ui/pantallaCompleta.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
 import {
@@ -44,6 +45,8 @@ const alturaInicial = Number(parametros.get('altura')) || 0;
 const semillaPropia = Number(parametros.get('semilla')) || Math.floor(Math.random() * 1e9);
 const configRed = configuracionRed();
 const menu = document.querySelector<HTMLElement>('#menu')!;
+// Pantalla completa (botón y tecla F): disponible ya en el menú.
+crearPantallaCompleta(document.querySelector<HTMLButtonElement>('#pantalla-completa')!);
 
 // 1 · ¿Solo o en una sala?
 let eleccion: Eleccion;

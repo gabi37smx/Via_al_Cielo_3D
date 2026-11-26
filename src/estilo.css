@@ -387,3 +387,34 @@ body {
 .sala-fila b {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Pantalla completa ---------- */
+
+#pantalla-completa {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  z-index: 10; /* también por encima del menú */
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.55);
+  color: #e6edf3;
+  font-size: 22px;
+  line-height: 40px;
+  cursor: pointer;
+}
+
+#pantalla-completa:hover {
+  background: rgb(0 0 0 / 0.8);
+}
+
+#pantalla-completa:focus-visible {
+  outline: 3px solid #f5c518;
+  outline-offset: 2px;
+}
+
+#pantalla-completa[hidden] {
+  display: none;
+}
