@@ -1,6 +1,10 @@
 /*
- * El escalador: el «trabajador» de Kenney Mini Characters (CC0), con casco,
- * brazos, piernas y sus propias animaciones (ver docs/creditos.md).
+ * El escalador y la escaladora (idea I5), de Kenney Mini Characters (CC0),
+ * con brazos, piernas y sus propias animaciones (ver docs/creditos.md):
+ * - escalador: el «trabajador», con casco de obra;
+ * - escaladora: `character-female-f`, la única con pelo largo, con la ropa
+ *   cambiada a rosa (jugador/paleta.ts). Los dos tienen el mismo esqueleto
+ *   y las mismas animaciones, así que todo lo demás sirve igual.
  *
  * La animación la decide la POSTURA (quieto, corriendo, subiendo, cayendo,
  * doble salto), no las teclas: así servirá igual para el jugador, los
@@ -14,7 +18,9 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as clonarConEsqueleto } from 'three/addons/utils/SkeletonUtils.js';
+import type { Aspecto } from '../red/protocolo.ts';
 import type { Postura } from './control.ts';
+import { ROPA_ESCALADORA, recolocarEnPaleta, type CambioColor } from './paleta.ts';
 
 export interface Personaje {
   raiz: THREE.Group;
@@ -59,16 +65,58 @@ function giroBrazoArriba(lado: 1 | -1): THREE.Quaternion {
   return new THREE.Quaternion().setFromEuler(new THREE.Euler(0.45, 0, 0)).multiply(enZ);
 }
 
-let modeloCargado: Promise<GLTF> | undefined;
+/** El archivo de cada aspecto y los cambios de color de su ropa. */
+const MODELOS: Record<Aspecto, { archivo: string; ropa: readonly CambioColor[] }> = {
+  escalador: { archivo: 'escalador.glb', ropa: [] },
+  escaladora: { archivo: 'escaladora.glb', ropa: ROPA_ESCALADORA },
+};
 
-/** Descarga el modelo UNA vez; todos los escaladores (tú y los rivales) lo comparten. */
-export function cargarModeloEscalador(url = `${import.meta.env.BASE_URL}modelos/escalador.glb`): Promise<GLTF> {
-  modeloCargado ??= new GLTFLoader().loadAsync(url);
-  return modeloCargado;
+const modelosCargados = new Map<Aspecto, Promise<GLTF>>();
+
+/**
+ * Cambia el color de la ropa apuntando sus vértices a otras casillas de la
+ * paleta (ver jugador/paleta.ts). Se hace una vez sobre el modelo cargado:
+ * todos los clones comparten la geometría y salen ya con la ropa cambiada.
+ */
+function cambiarRopa(gltf: GLTF, cambios: readonly CambioColor[]) {
+  if (cambios.length === 0) return;
+  gltf.scene.traverse((o) => {
+    const malla = o as THREE.SkinnedMesh;
+    if (!malla.isSkinnedMesh) return;
+    const g = malla.geometry;
+    const uv = g.attributes.uv!;
+    const indices = g.attributes.skinIndex!;
+    const pesos = g.attributes.skinWeight!;
+    for (let i = 0; i < uv.count; i++) {
+      // El hueso que más mueve este vértice.
+      let mejor = 0;
+      for (let k = 1; k < 4; k++) if (pesos.getComponent(i, k) > pesos.getComponent(i, mejor)) mejor = k;
+      const hueso = malla.skeleton.bones[indices.getComponent(i, mejor)]?.name ?? '';
+      const [u, v] = recolocarEnPaleta(uv.getX(i), uv.getY(i), hueso, cambios);
+      uv.setXY(i, u, v);
+    }
+    uv.needsUpdate = true;
+  });
 }
 
-export async function cargarPersonaje(): Promise<Personaje> {
-  return crearPersonaje(await cargarModeloEscalador());
+/** Descarga cada modelo UNA vez; todos los que lo usan (tú y los rivales) lo comparten. */
+export function cargarModelo(aspecto: Aspecto): Promise<GLTF> {
+  let promesa = modelosCargados.get(aspecto);
+  if (!promesa) {
+    const { archivo, ropa } = MODELOS[aspecto];
+    promesa = new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}modelos/${archivo}`).then((gltf) => {
+      cambiarRopa(gltf, ropa);
+      return gltf;
+    });
+    modelosCargados.set(aspecto, promesa);
+  }
+  return promesa;
+}
+
+/** Los dos modelos, para poder dibujar a cualquier rival de la sala. */
+export async function cargarModelos(): Promise<Record<Aspecto, GLTF>> {
+  const [escalador, escaladora] = await Promise.all([cargarModelo('escalador'), cargarModelo('escaladora')]);
+  return { escalador, escaladora };
 }
 
 /**

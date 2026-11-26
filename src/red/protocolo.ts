@@ -33,9 +33,20 @@ export function limpiarNombre(texto: string): string {
   return n || 'Escalador';
 }
 
+/** Con quién se sube (idea I5): se elige en el menú, no se adivina por el nombre. */
+export type Aspecto = 'escalador' | 'escaladora';
+export const ASPECTOS: readonly Aspecto[] = ['escalador', 'escaladora'];
+
+/** Lee un aspecto que llega de fuera (red, URL, localStorage); si no vale, escalador. */
+export function leerAspecto(valor: unknown): Aspecto {
+  return ASPECTOS.includes(valor as Aspecto) ? (valor as Aspecto) : 'escalador';
+}
+
 export interface Miembro {
   id: string;
   nombre: string;
+  /** Escalador o escaladora: los rivales te ven como te has elegido. */
+  aspecto: Aspecto;
   /** Cuándo entró en la sala (ms desde 1970): el más antiguo es el anfitrión. */
   unidoEn: number;
   /** Semilla de la torre que trae este jugador. */

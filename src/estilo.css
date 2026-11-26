@@ -328,6 +328,26 @@ body {
   background: #e8553a;
 }
 
+.menu-aspecto {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.menu-aspecto h2 {
+  grid-column: 1 / -1;
+}
+
+/* El elegido se ve encendido; el otro, apagado. */
+.menu-caja .menu-aspecto button[aria-pressed='true'] {
+  background: #f5c518;
+  color: #151c28;
+}
+
+.menu-caja .menu-aspecto button[data-aspecto='escaladora'][aria-pressed='true'] {
+  background: #f47ae9;
+}
+
 .menu-caja button:disabled {
   opacity: 0.45;
   cursor: not-allowed;

@@ -1,8 +1,9 @@
 /*
- * Menú de inicio: jugar solo, crear una sala o unirse con un código.
- * Devuelve lo que ha elegido el jugador; no sabe nada de la red.
+ * Menú de inicio: quién sube (escalador o escaladora, idea I5) y jugar solo,
+ * crear una sala o unirse con un código. Devuelve lo que ha elegido el
+ * jugador; no sabe nada de la red.
  */
-import { limpiarNombre, normalizarCodigo } from '../red/protocolo.ts';
+import { ASPECTOS, leerAspecto, limpiarNombre, normalizarCodigo, type Aspecto } from '../red/protocolo.ts';
 
 export type Eleccion =
   | { modo: 'solo' }
@@ -10,6 +11,25 @@ export type Eleccion =
   | { modo: 'unirse'; nombre: string; codigo: string };
 
 const CLAVE_NOMBRE = 'via-al-cielo-3d:nombre';
+const CLAVE_ASPECTO = 'via-al-cielo-3d:aspecto';
+const TEXTO_ASPECTO: Record<Aspecto, string> = { escalador: 'Escalador', escaladora: 'Escaladora' };
+
+/** El último aspecto elegido (escalador si nunca se eligió). */
+export function aspectoGuardado(): Aspecto {
+  try {
+    return leerAspecto(localStorage.getItem(CLAVE_ASPECTO));
+  } catch {
+    return 'escalador';
+  }
+}
+
+function guardarAspecto(a: Aspecto) {
+  try {
+    localStorage.setItem(CLAVE_ASPECTO, a);
+  } catch {
+    /* sin almacenamiento: la próxima vez saldrá el de por defecto */
+  }
+}
 
 function nombreGuardado(): string {
   try {
@@ -27,12 +47,20 @@ function guardarNombre(n: string) {
   }
 }
 
-/** Muestra el menú y espera a que el jugador elija. `error` se enseña arriba (p. ej. sala llena). */
+/**
+ * Muestra el menú y espera a que el jugador elija. `error` se enseña arriba
+ * (p. ej. sala llena). Lo que elige en «¿Quién sube?» se guarda al momento:
+ * se lee luego con `aspectoGuardado()`.
+ */
 export function mostrarMenu(raiz: HTMLElement, hayRed: boolean, error = ''): Promise<Eleccion> {
   raiz.innerHTML = `
     <div class="menu-caja">
       <h1>Vía al Cielo <span>3D</span></h1>
       ${error ? `<p class="menu-error" role="alert"></p>` : ''}
+      <div class="menu-aspecto" role="group" aria-label="¿Quién sube?">
+        <h2>¿Quién sube?</h2>
+        ${ASPECTOS.map((a) => `<button type="button" data-aspecto="${a}">${TEXTO_ASPECTO[a]}</button>`).join('')}
+      </div>
       <button type="button" class="menu-solo">Jugar solo</button>
       <div class="menu-carrera">
         <h2>Carrera (2-4 jugadores)</h2>
@@ -51,6 +79,19 @@ export function mostrarMenu(raiz: HTMLElement, hayRed: boolean, error = ''): Pro
   const nombre = $<HTMLInputElement>('.menu-nombre');
   const codigo = $<HTMLInputElement>('.menu-codigo');
   nombre.value = nombreGuardado();
+  // Escalador / Escaladora: dos botones que se comportan como una opción.
+  const botonesAspecto = [...raiz.querySelectorAll<HTMLButtonElement>('[data-aspecto]')];
+  const marcarAspecto = (a: Aspecto) => {
+    for (const b of botonesAspecto) b.setAttribute('aria-pressed', String(b.dataset.aspecto === a));
+  };
+  marcarAspecto(aspectoGuardado());
+  for (const b of botonesAspecto) {
+    b.addEventListener('click', () => {
+      const a = leerAspecto(b.dataset.aspecto);
+      guardarAspecto(a);
+      marcarAspecto(a);
+    });
+  }
   for (const sel of ['.menu-crear', '.menu-entrar']) $<HTMLButtonElement>(sel).disabled = !hayRed;
   $<HTMLButtonElement>('.menu-solo').focus();
 
