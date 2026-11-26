@@ -19,8 +19,8 @@ import {
   type Jugada,
   type Partida,
 } from './reglas/partida.ts';
-import { RADIO_SALIENTES, alturaSuelo, generarTramo, posicionSaliente } from './reglas/torre.ts';
-import { crearCamaraTerceraPersona } from './mundo/camara.ts';
+import { alturaSuelo, generarTramo, posicionSaliente, puntoDeSalida } from './reglas/torre.ts';
+import { crearCamaraTerceraPersona, giroHaciaPared } from './mundo/camara.ts';
 import { crearCueva } from './mundo/cueva.ts';
 import { crearEscena } from './mundo/escena.ts';
 import { crearFragmentos, crearMurcielagos } from './mundo/objetos.ts';
@@ -95,21 +95,21 @@ const roca = crearTexturaRoca({ oscuro: '#2b2620', claro: '#8c7f6c' });
 const piedra = crearTexturaRoca({ oscuro: '#6b6356', claro: '#d9cdb4', semilla: 7, relieve: 4 });
 const fragmentos = crearFragmentos(peligros.fragmentos);
 const murcielagos = crearMurcielagos(peligros.murcielagos);
-mundo.escena.add(crearCueva(mundo.escena, roca), crearTorre(tramo, roca, piedra), fragmentos.grupo, murcielagos.grupo);
+mundo.escena.add(crearCueva(mundo.escena, roca, tramo), crearTorre(tramo, piedra), fragmentos.grupo, murcielagos.grupo);
 
-// Dónde empieza: en el suelo junto al primer saliente, o en el saliente pedido con ?altura.
+// Dónde empieza: en el suelo antes del primer saliente, o en el saliente pedido con ?altura.
 const inicio = tramo.salientes.find((s) => s.y >= alturaInicial) ?? tramo.salientes[0]!;
-const anguloInicio = alturaInicial > 0 ? inicio.angulo : inicio.angulo - 0.7 - puesto * 0.45;
-const salida = alturaInicial > 0
-  ? { ...posicionSaliente(inicio), y: inicio.y }
-  : { x: Math.cos(anguloInicio) * (RADIO_SALIENTES + 2), z: Math.sin(anguloInicio) * (RADIO_SALIENTES + 2), y: 0 };
+const enSuelo = puntoDeSalida(tramo, puesto);
+const anguloInicio = alturaInicial > 0 ? inicio.angulo : enSuelo.angulo;
+const salida = alturaInicial > 0 ? { ...posicionSaliente(inicio), y: inicio.y } : { x: enSuelo.x, z: enSuelo.z, y: 0 };
 
 // El modelo del escalador se descarga (~270 kB): el juego arranca cuando llega.
 const modelo = await cargarModeloEscalador();
 const personaje = crearPersonaje(modelo);
 const sombra = crearSombra();
 mundo.escena.add(personaje.raiz, sombra.mancha);
-const camara = crearCamaraTerceraPersona(mundo.camara, Math.PI / 2 - anguloInicio);
+// La cámara empieza entre el escalador y el centro del pozo, mirando a la pared.
+const camara = crearCamaraTerceraPersona(mundo.camara, giroHaciaPared(salida.x, salida.z));
 
 // 2 · Los rivales de la sala: aparecen y desaparecen según la presencia de Supabase.
 const rivales = crearRivales(mundo.escena, modelo);
@@ -131,7 +131,7 @@ const anterior = { x: 0, y: 0, z: 0 };
 
 function reiniciar() {
   escalador = crearEscalador(salida.x, salida.y, salida.z);
-  escalador.orientacion = Math.atan2(-Math.cos(anguloInicio), -Math.sin(anguloInicio)); // mirando a la columna
+  escalador.orientacion = Math.atan2(Math.cos(anguloInicio), Math.sin(anguloInicio)); // mirando a la pared
   Object.assign(anterior, salida);
   partida = crearPartida();
   partida.alturaMaxima = salida.y;
@@ -183,6 +183,7 @@ const bucle = crearBucle({
       -m.ratonX * CC.sensibilidadRaton - m.girarX * CC.velocidadGiro * paso,
       m.ratonY * CC.sensibilidadRaton + m.girarY * CC.velocidadGiro * paso,
     );
+    camara.recolocar(escalador.x, escalador.z, paso);
 
     anterior.x = escalador.x;
     anterior.y = escalador.y;

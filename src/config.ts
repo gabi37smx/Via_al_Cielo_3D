@@ -4,7 +4,7 @@
  */
 export const CONFIG = {
   escalador: {
-    /** Radio de la cápsula (para no meterse en la columna). */
+    /** Radio de la cápsula (para no meterse en la pared). */
     radio: 0.35,
     /** Velocidad máxima corriendo (m/s). */
     velocidad: 6,
@@ -41,7 +41,14 @@ export const CONFIG = {
     sensibilidadRaton: 0.0025,
     /** Giro con Q/E o el stick derecho (rad/s). */
     velocidadGiro: 2.5,
-    /** Distancia mínima a la columna para no meterse dentro (m). */
-    margenColumna: 0.4,
+    /** Distancia mínima a la pared para no meterse dentro (m). */
+    margenPared: 0.3,
+    /**
+     * Recolocación sola: si no se toca la cámara durante `esperaRecolocar` s,
+     * vuelve poco a poco a ponerse entre el centro del pozo y el escalador,
+     * mirando a la pared (`recolocar` = rapidez; 0 = nunca).
+     */
+    recolocar: 1.5,
+    esperaRecolocar: 1.2,
   },
 } as const;

@@ -13,7 +13,7 @@ import {
   generarMurcielagos,
   pasoPartida,
 } from '../reglas/partida.ts';
-import { RADIO_SALIENTES, alturaSuelo, generarTramo } from '../reglas/torre.ts';
+import { alturaSuelo, generarTramo, puntoDeSalida } from '../reglas/torre.ts';
 import { crearCerebro } from './cerebro.ts';
 
 export interface ResultadoSimulacion {
@@ -45,8 +45,8 @@ export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): Res
     fragmentos: generarFragmentos(semilla, tramo),
     murcielagos: generarMurcielagos(semilla, tramo, op.murcielagos ?? REGLAS.murcielagosCueva),
   };
-  const a = tramo.salientes[0]!.angulo - 0.7;
-  const e = crearEscalador(Math.cos(a) * (RADIO_SALIENTES + 2), 0, Math.sin(a) * (RADIO_SALIENTES + 2));
+  const salida = puntoDeSalida(tramo);
+  const e = crearEscalador(salida.x, 0, salida.z);
   const partida = crearPartida();
   const r: ResultadoSimulacion = {
     semilla, llego: false, murio: false, segundos: 0, saltos: 0, doblesSaltos: 0,

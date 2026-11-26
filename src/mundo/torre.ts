@@ -1,5 +1,7 @@
 /*
  * Dibuja un tramo de la torre a partir de lo que calcula `reglas/torre.ts`.
+ * La pared que se escala la pone el escenario (mundo/cueva.ts); aquí van los
+ * salientes y el rellano, que salen de esa pared hacia dentro.
  *
  * Los ~90 salientes de un tramo son UNA sola malla instanciada: la GPU recibe
  * la caja una vez y una lista de posiciones, y la dibuja en una sola llamada.
@@ -9,35 +11,20 @@ import * as THREE from 'three';
 import {
   FONDO_CAJA,
   GROSOR_SALIENTE,
-  METROS_POR_TRAMO,
   RADIO_CENTRO_CAJA,
-  RADIO_COLUMNA,
+  RADIO_PARED,
   RADIO_RELLANO,
   type Tramo,
 } from '../reglas/torre.ts';
 import { materialRoca, type TexturaRoca } from './texturas.ts';
 
-/** Cada cuántos metros se repite la textura de roca. */
-const METROS_POR_TEXTURA = 4;
-
 /**
- * @param roca textura de la columna
- * @param piedra textura de salientes y rellano: MÁS CLARA que la columna,
+ * @param piedra textura de salientes y rellano: MÁS CLARA que la pared,
  *   porque lo que se pisa tiene que distinguirse de un vistazo
  */
-export function crearTorre(tramo: Tramo, roca: TexturaRoca, piedra: TexturaRoca): THREE.Group {
+export function crearTorre(tramo: Tramo, piedra: TexturaRoca): THREE.Group {
   const grupo = new THREE.Group();
   grupo.name = `tramo-${tramo.indice}`;
-
-  // La columna central: un cilindro de 220 m.
-  const vueltas = Math.round((2 * Math.PI * RADIO_COLUMNA) / METROS_POR_TEXTURA);
-  const columna = new THREE.Mesh(
-    new THREE.CylinderGeometry(RADIO_COLUMNA, RADIO_COLUMNA, METROS_POR_TRAMO, 48, 1, true),
-    materialRoca(roca, vueltas, METROS_POR_TRAMO / METROS_POR_TEXTURA),
-  );
-  columna.position.y = tramo.base + METROS_POR_TRAMO / 2;
-  columna.castShadow = columna.receiveShadow = true;
-  grupo.add(columna);
 
   // Los salientes: una caja de 1×1×1 que cada instancia escala y gira.
   const salientes = new THREE.InstancedMesh(
@@ -57,7 +44,7 @@ export function crearTorre(tramo: Tramo, roca: TexturaRoca, piedra: TexturaRoca)
     // Las medidas de la caja salen de reglas/torre.ts: lo que se ve = lo que se pisa.
     const radio = RADIO_CENTRO_CAJA;
     posicion.set(Math.cos(s.angulo) * radio, s.y - GROSOR_SALIENTE / 2, Math.sin(s.angulo) * radio);
-    // Girar la caja para que su eje z apunte hacia fuera de la columna.
+    // Girar la caja para que su eje z vaya a lo largo del radio (hacia la pared).
     giro.setFromAxisAngle(ejeY, Math.PI / 2 - s.angulo);
     escala.set(s.ancho, GROSOR_SALIENTE, FONDO_CAJA);
     salientes.setMatrixAt(i, matriz.compose(posicion, giro, escala));
@@ -66,12 +53,15 @@ export function crearTorre(tramo: Tramo, roca: TexturaRoca, piedra: TexturaRoca)
   salientes.computeBoundingSphere();
   grupo.add(salientes);
 
-  // El rellano de arriba: un anillo completo, se llega desde cualquier lado.
-  const rellano = new THREE.Mesh(
-    new THREE.CylinderGeometry(RADIO_RELLANO, RADIO_RELLANO, GROSOR_SALIENTE, 48),
-    materialRoca(piedra, 3, 0.3),
-  );
-  rellano.position.y = tramo.rellano - GROSOR_SALIENTE / 2;
+  // El rellano de arriba: una cornisa que da la vuelta entera a la pared
+  // (un círculo con un agujero, con grosor). Se llega desde cualquier lado.
+  const forma = new THREE.Shape().absarc(0, 0, RADIO_PARED + 0.2, 0, Math.PI * 2);
+  forma.holes.push(new THREE.Path().absarc(0, 0, RADIO_RELLANO, 0, Math.PI * 2, true));
+  const geometria = new THREE.ExtrudeGeometry(forma, { depth: GROSOR_SALIENTE, bevelEnabled: false, curveSegments: 48 });
+  geometria.rotateX(-Math.PI / 2); // de vertical a tumbada; la cara de arriba queda en y = GROSOR
+  // Las coordenadas de textura de ExtrudeGeometry van en metros: 0,3 = cada 3,3 m.
+  const rellano = new THREE.Mesh(geometria, materialRoca(piedra, 0.3, 0.3));
+  rellano.position.y = tramo.rellano - GROSOR_SALIENTE;
   rellano.castShadow = rellano.receiveShadow = true;
   grupo.add(rellano);
 

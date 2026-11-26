@@ -6,10 +6,10 @@
  * - Movimiento relativo a la cámara: «adelante» es siempre hacia donde mira.
  * - Aceleración y frenado: no arranca ni para en seco.
  * - Salto, doble salto, tiempo coyote y salto guardado (buffer).
- * - No puede meterse en la columna ni salir de la cueva.
+ * - No puede meterse en la pared del pozo: se desliza por ella.
  */
 import { CONFIG } from '../config.ts';
-import { RADIO_COLUMNA, RADIO_MUNDO } from '../reglas/torre.ts';
+import { RADIO_PARED } from '../reglas/torre.ts';
 
 const C = CONFIG.escalador;
 export const VELOCIDAD_SALTO = Math.sqrt(2 * C.gravedad * C.alturaSalto);
@@ -151,21 +151,19 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   // 5 · Gravedad.
   e.vy = Math.max(e.vy - C.gravedad * paso, -C.velocidadMaxCaida);
 
-  // 6 · Moverse en horizontal sin meterse en la columna ni salir de la cueva.
+  // 6 · Moverse en horizontal sin meterse en la pared del pozo.
   e.x += e.vx * paso;
   e.z += e.vz * paso;
   const r = Math.hypot(e.x, e.z);
-  const rMin = RADIO_COLUMNA + C.radio;
-  const rMax = RADIO_MUNDO - C.radio;
-  if (r < rMin || r > rMax) {
-    const nx = r > 0 ? e.x / r : 1;
-    const nz = r > 0 ? e.z / r : 0;
-    const limite = r < rMin ? rMin : rMax;
-    e.x = nx * limite;
-    e.z = nz * limite;
-    // Quitar la parte de la velocidad que empuja contra el límite (se desliza).
+  const rMax = RADIO_PARED - C.radio;
+  if (r > rMax) {
+    const nx = e.x / r;
+    const nz = e.z / r;
+    e.x = nx * rMax;
+    e.z = nz * rMax;
+    // Quitar la parte de la velocidad que empuja contra la pared (se desliza).
     const contra = e.vx * nx + e.vz * nz;
-    if ((r < rMin && contra < 0) || (r > rMax && contra > 0)) {
+    if (contra > 0) {
       e.vx -= contra * nx;
       e.vz -= contra * nz;
     }

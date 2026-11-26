@@ -20,10 +20,10 @@ Es la versión 3D de *Vía al Cielo* (2D, canvas, v73). De aquel juego se conser
 ## Cómo se juega
 
 - **Mover:** WASD o flechas, relativo a la cámara. **Saltar:** espacio; en el aire, otra vez = **doble salto** (con voltereta). Con **mando**: stick izquierdo, stick derecho y botón A.
-- **Cámara:** tercera persona, detrás y algo por encima, sigue con un pequeño retardo; el ratón la gira (clic para capturarlo, Esc lo suelta) y también Q/E. Si la columna queda en medio, se acerca al escalador.
+- **Cámara:** tercera persona, detrás y algo por encima, sigue con un pequeño retardo; el ratón la gira (clic para capturarlo, Esc lo suelta) y también Q/E. Va por dentro del pozo, mirando a la pared; si no se toca 1,2 s, vuelve sola a ese sitio. Si la pared queda detrás, se acerca al escalador.
 - **Salientes de un sentido:** se atraviesan desde abajo al saltar y frenan al caer encima, como en el 2D.
 - **Sombra redonda** bajo el escalador siempre visible: en 3D es lo que permite calcular dónde vas a caer.
-- **El mundo:** salientes apilados en espiral alrededor de una columna central (la «torre»). Cada 220 m cambia el tramo y el escenario, **sin repetir ninguno**:
+- **El mundo:** se escala la **pared de un pozo circular**, como en el 2D: salientes que salen de la roca hacia dentro y suben en espiral (la «torre»); el centro está vacío. Cada 220 m cambia el tramo y el escenario, **sin repetir ninguno**:
 
   | Tramo | Altura | Escenario | Peligro |
   |---|---|---|---|
@@ -57,12 +57,12 @@ Igual que el original: subir lo más alto posible. Vida a 0 → fin de partida �
 | Altura del salto | ~8 m | 3,5 m + 2 m el doble salto (gravedad 28 m/s² → sale a 14 m/s) |
 | Carrera | — | 6 m/s; acelera a 45 m/s², frena a 60 m/s²; en el aire, 55 % de control |
 | Ayudas al salto | — | tiempo coyote 0,1 s y salto guardado 0,12 s |
-| Separación entre salientes | — | 2-3 m en vertical, 30-50° de giro (2-3,4 m entre centros) |
-| Columna / salientes | — | columna de 3 m de radio; salientes de 1,6-2,2 × 2,2 m; ~90 por tramo |
-| Final de cada tramo | — | rellano: anillo completo alrededor de la columna |
+| Separación entre salientes | — | 2-3 m en vertical, 2,2-3,4 m entre centros (11-18° de giro) |
+| Pared / salientes | — | pozo de 12 m de radio; salientes de 1,6-2,2 × 2,2 m saliendo de la pared; ~90 por tramo, ~30 por vuelta |
+| Final de cada tramo | — | rellano: cornisa de 3 m que da la vuelta entera a la pared |
 | Caída que hace daño | > 90 m → −30 % | igual |
 | Daño de animales | 10-20 % | igual (murciélago 10, águila 15…) |
-| Murciélagos en la cueva | 25 por pantalla | 25 por tramo, dando vueltas por encima de los salientes (~2 golpes por subida simulada) |
+| Murciélagos en la cueva | 25 por pantalla | 40 por tramo, dando vueltas pegados a la pared (la pared da 2,4 veces más vuelta que la antigua columna; ~2 golpes por subida simulada) |
 | Fragmentos | 3 por pantalla, +25 % de vida | igual: uno por tercio del tramo, flotando sobre un saliente |
 | Invulnerable tras golpe | 90 fotogramas | 1,5 s |
 | Velocidad máxima creíble | 14 m/s (API) | no superarla o el ranking rechaza la partida |
@@ -126,7 +126,7 @@ Cada una en **su propia rama**: se prueba y, si no convence, no se fusiona y `ma
 | # | Idea | Cómo | Cuándo |
 |---|---|---|---|
 | I1 | **Pantalla completa** (todo es oscuro y molesta la luz del navegador) | Botón y tecla **F** con la API de pantalla completa; Esc sale | ✅ Hecha (`src/ui/pantallaCompleta.ts`) |
-| I2 | **Escalar la pared de la cueva** en vez de una columna central: salientes en espiral por la pared circular, como el 2D | Se invierte la torre: los salientes salen de la pared hacia dentro; la cámara, desde el centro, mira a la pared. Se ven mejor los cristales y ya nada se pone entre la cámara y el escalador. Las reglas (2-3 m, rellano, semilla) se mantienen y las pruebas y la simulación lo vigilan | Antes de la sesión 6 (la carrera depende de la forma del mundo) |
+| I2 | **Escalar la pared de la cueva** en vez de una columna central: salientes en espiral por la pared circular, como el 2D | Se invierte la torre: los salientes salen de la pared hacia dentro; la cámara, desde el centro, mira a la pared. Se ven mejor los cristales y ya nada se pone entre la cámara y el escalador. Las reglas (2-3 m, rellano, semilla) se mantienen y las pruebas y la simulación lo vigilan | ✅ Hecha (decisión 029) |
 | I3 | **Agarrarse y trepar**: saltar, cogerse al borde con los brazos y subir al saliente | Estado nuevo en el movimiento (`colgado` → `trepando`): si salta y el borde queda a la altura de las manos, se agarra, se queda colgado y sube en ~0,5 s. Kenney no trae animación de trepar: se hace con poses del propio modelo (brazos arriba, agacharse) y movimiento por código | Sesión aparte, después de I2 |
 | I4 | **Cada escenario con su escalada**: cuevas → la pared; aire libre → la montaña del fondo; ciudades → el monumento (p. ej. la torre Eiffel en París) | La montaña sale de la misma idea que I2 (pared rocosa, ahora por fuera). Los monumentos son lo más caro: modelo propio por código (celosía de la Eiffel) o CC0 si lo hay | Sesión 7 en adelante; las ciudades, como mucho 1-2 |
 | I5 | **Elegir escaladora o escalador** antes de jugar o entrar en una sala (no se adivina por el nombre: hay nombres de los dos) | En el menú: «Escalador / Escaladora». La escaladora: un personaje femenino de Kenney Mini Characters (CC0) con **pelo largo** y colores alegres (rosa); si ninguno trae rosa, se le cambia el color de la ropa. La elección va en la presencia de la sala para que los rivales te vean igual que tú | Junto con la sesión 6 o antes (es corta) |
@@ -162,6 +162,7 @@ Cada una en **su propia rama**: se prueba y, si no convence, no se fusiona y `ma
 - **026** · **Estado compacto, 10 veces por segundo**: 8 números redondeados (cm y milésimas) por mensaje. Lo que llega se valida (`decodificar`) y lo que no tiene buena pinta se tira.
 - **027** · **Interpolación con 150 ms de retardo** y sin sincronizar relojes: se estima la diferencia de reloj con el mensaje más rápido visto (el mínimo de «llegada − salida»). Con 10 envíos/s, 150 ms garantizan casi siempre un estado a cada lado.
 - **028** · **Prueba con dos navegadores** automatizada (`npm run prueba-red`): dos Chromium sin pantalla en la misma sala contra Supabase de verdad comprueban que se ven, la semilla, el anfitrión, la posición del rival y el relevo del anfitrión.
+- **029** · **Se escala la pared de un pozo, no una columna** (idea I2 de Gabi; cambia la 002 y la 013): pozo de **12 m de radio** con los salientes saliendo de la pared y el centro vacío. Con 22 m (el radio de la cueva de antes) cabían 50 salientes por vuelta y la espiral casi no se notaba; con 12 m son ~30, 3 vueltas por tramo, y se ve la pared de enfrente. La separación entre salientes se mide ya en **metros entre centros (2,2-3,4 m)** y el giro sale de ahí, porque lo que decide si se llega saltando es la distancia, no el ángulo. El rellano pasa a ser una **cornisa de 3 m** pegada a la pared. La cámara va por dentro mirando a la pared y **se recoloca sola** si no se toca (`recolocar` en `config.ts`; 0 la apaga). Los murciélagos se reparten en m/s en vez de rad/s y suben de 25 a **40** para mantener ~2 golpes por subida (200 torres simuladas: todas se suben, 75 s de media, 0 tropiezos).
 
 ## Pendiente
 
