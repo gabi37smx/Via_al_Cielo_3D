@@ -44,7 +44,8 @@ export function crearPantallaCarrera(raiz: HTMLElement, op: OpcionesPantallaCarr
     op.alEmpezar(conOrdenador);
   };
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && puedeEmpezar) empezar();
+    // Intro sobre un botón (p. ej. «Continuar» del menú de pausa) es ese botón, no empezar.
+    if (e.key === 'Enter' && puedeEmpezar && !(e.target instanceof HTMLButtonElement)) empezar();
   });
 
   function botonEmpezar(texto: string): HTMLElement {
