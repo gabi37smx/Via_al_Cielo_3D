@@ -27,6 +27,29 @@ export const CONFIG = {
     giro: 12,
     /** Duración de la voltereta del doble salto (s). */
     voltereta: 0.45,
+    /*
+     * Agarrarse al borde y trepar (idea I3). Si en el aire el borde de un
+     * saliente queda delante y a la altura de las manos, se agarra.
+     */
+    /** El borde tiene que quedar entre estas alturas sobre los pies (m). */
+    agarreMin: 1,
+    agarreMax: 1.7,
+    /**
+     * Colgado, los pies quedan a esta distancia por debajo del borde (m). El
+     * modelo es cabezón y de brazos cortos: con los brazos arriba las manos
+     * quedan a ~1,25 m de los pies (la cabeza asoma por encima del borde).
+     */
+    alturaManos: 1.25,
+    /** Hasta dónde llegan las manos por delante del cuerpo (m). */
+    alcance: 0.8,
+    /** Subiendo solo se agarra casi en lo más alto del salto (m/s). */
+    agarreSubiendo: 1.5,
+    /** Cayendo más rápido que esto ya no se agarra (m/s): no salva las caídas largas. */
+    agarreCayendo: 15,
+    /** Lo que tarda en subir al saliente (s). */
+    trepar: 0.5,
+    /** Tras soltarse, tiempo sin poder agarrarse otra vez (s). */
+    esperaReagarre: 0.35,
   },
   camara: {
     distancia: 7,

@@ -58,7 +58,7 @@ export function cabeEnSala(miembros: Miembro[], id: string): boolean {
 
 /* ---------- Estado de un escalador ---------- */
 
-export const POSTURAS: readonly Postura[] = ['quieto', 'corriendo', 'subiendo', 'cayendo', 'dobleSalto'];
+export const POSTURAS: readonly Postura[] = ['quieto', 'corriendo', 'subiendo', 'cayendo', 'dobleSalto', 'colgado', 'trepando'];
 
 export interface EstadoRed {
   /** Reloj del que lo envía (ms). Solo sirve para espaciar los estados. */
@@ -69,7 +69,7 @@ export interface EstadoRed {
   orientacion: number;
   postura: Postura;
   rapidez: number;
-  /** Progreso de la voltereta del doble salto (0-1). */
+  /** Progreso de la voltereta del doble salto o de trepar (0-1). */
   voltereta: number;
 }
 

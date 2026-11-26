@@ -26,6 +26,7 @@ console.table(
     segundos: Math.round(r.segundos),
     saltos: r.saltos,
     dobles: r.doblesSaltos,
+    agarres: r.agarres,
     tropiezos: r.tropiezos,
     golpes: r.golpes,
     fragmentos: r.fragmentos,
@@ -34,4 +35,4 @@ console.table(
 );
 console.log(`${torres} torres con ${murcielagos} murciélagos, simuladas en ${Math.round(ms)} ms`);
 console.log(`Llegan arriba: ${resultados.filter((r) => r.llego).length}/${torres} · mueren: ${resultados.filter((r) => r.murio).length}`);
-console.log(`Media: ${media((r) => r.segundos).toFixed(0)} s, ${media((r) => r.golpes).toFixed(1)} golpes, vida final ${media((r) => r.vida).toFixed(0)}, ${media((r) => r.tropiezos).toFixed(1)} tropiezos`);
+console.log(`Media: ${media((r) => r.segundos).toFixed(0)} s, ${media((r) => r.golpes).toFixed(1)} golpes, vida final ${media((r) => r.vida).toFixed(0)}, ${media((r) => r.tropiezos).toFixed(1)} tropiezos, ${media((r) => r.agarres).toFixed(1)} agarres`);

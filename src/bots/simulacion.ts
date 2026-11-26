@@ -25,6 +25,8 @@ export interface ResultadoSimulacion {
   segundos: number;
   saltos: number;
   doblesSaltos: number;
+  /** Veces que se ha quedado corto y se ha agarrado al borde. */
+  agarres: number;
   /** Caídas de más de 5 m (se ha equivocado de saliente). */
   tropiezos: number;
   golpes: number;
@@ -50,7 +52,7 @@ export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): Res
   const partida = crearPartida();
   const r: ResultadoSimulacion = {
     semilla, llego: false, murio: false, segundos: 0, saltos: 0, doblesSaltos: 0,
-    tropiezos: 0, golpes: 0, fragmentos: 0, vida: 100,
+    agarres: 0, tropiezos: 0, golpes: 0, fragmentos: 0, vida: 100,
   };
 
   const cerebro = crearCerebro(tramo);
@@ -59,6 +61,7 @@ export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): Res
     const sucesos = pasoEscalador(e, cerebro.pensar(e), suelo, PASO);
     if (sucesos.salto) r.saltos++;
     if (sucesos.dobleSalto) r.doblesSaltos++;
+    if (sucesos.agarre) r.agarres++;
     if (sucesos.aterrizaje > 5) r.tropiezos++;
     pasoPartida(partida, { x: e.x, y: e.y, z: e.z, aterrizaje: sucesos.aterrizaje }, peligros, PASO);
     r.segundos = t;

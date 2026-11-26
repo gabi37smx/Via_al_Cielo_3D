@@ -6,6 +6,10 @@
  * doble salto), no las teclas: así servirá igual para el jugador, los
  * rivales de la red y los del ordenador. Por encima del modelo se añaden la
  * voltereta del doble salto y el aplastamiento al aterrizar.
+ *
+ * Kenney no trae animación de colgarse ni de trepar (idea I3): se hacen con
+ * sus propias animaciones (`fall`, `crouch`) y levantando los brazos a mano,
+ * girando los huesos `arm-left` y `arm-right` después de la animación.
  */
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
@@ -16,8 +20,8 @@ export interface Personaje {
   raiz: THREE.Group;
   /** Coloca los pies en (x, y, z) mirando hacia `orientacion`. */
   colocar(x: number, y: number, z: number, orientacion: number): void;
-  /** `progresoVoltereta` va de 0 a 1 durante el doble salto. */
-  animar(postura: Postura, rapidez: number, progresoVoltereta: number, dt: number): void;
+  /** `progreso` va de 0 a 1 durante el doble salto y al trepar (ver `progresoPostura`). */
+  animar(postura: Postura, rapidez: number, progreso: number, dt: number): void;
   /** Aplastamiento breve al tocar el suelo. */
   aterrizar(fuerza: number): void;
 }
@@ -38,7 +42,22 @@ const ANIMACION: Record<Postura, string> = {
   subiendo: 'jump',
   cayendo: 'fall',
   dobleSalto: 'jump',
+  colgado: 'fall',
+  trepando: 'crouch',
 };
+
+/** Giro de los brazos para tenerlos estirados hacia arriba (rad). */
+/**
+ * Giro de cada brazo para tenerlo arriba, agarrado al borde. En el modelo, el
+ * brazo en reposo apunta HACIA EL LADO (pose en T) y las animaciones lo bajan
+ * girando en z. Se sube con 90° en z (en espejo: + el izquierdo, − el
+ * derecho) y luego 0,45 rad en x para echarlo hacia delante. Medido: apunta
+ * arriba (0,82) y hacia delante (0,57).
+ */
+function giroBrazoArriba(lado: 1 | -1): THREE.Quaternion {
+  const enZ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, (lado * Math.PI) / 2));
+  return new THREE.Quaternion().setFromEuler(new THREE.Euler(0.45, 0, 0)).multiply(enZ);
+}
 
 let modeloCargado: Promise<GLTF> | undefined;
 
@@ -96,6 +115,15 @@ export function crearPersonaje(gltf: GLTF): Personaje {
   }
   let actual: THREE.AnimationAction | undefined;
   let posturaAnterior: Postura | undefined;
+  const brazos = (
+    [
+      ['arm-left', giroBrazoArriba(1)],
+      ['arm-right', giroBrazoArriba(-1)],
+    ] as const
+  ).flatMap(([nombre, arriba]) => {
+    const hueso = modelo.getObjectByName(nombre);
+    return hueso ? [{ hueso, arriba }] : [];
+  });
 
   function cambiarA(nombre: string, reiniciar = false) {
     const nueva = acciones.get(nombre);
@@ -113,7 +141,7 @@ export function crearPersonaje(gltf: GLTF): Personaje {
       raiz.position.set(x, y, z);
       raiz.rotation.y = orientacion;
     },
-    animar(postura, rapidez, progresoVoltereta, dt) {
+    animar(postura, rapidez, progreso, dt) {
       let nombre = ANIMACION[postura];
       if (postura === 'corriendo' && rapidez < RAPIDEZ_ANDAR) nombre = 'walk';
       // El doble salto vuelve a empezar la animación de salto.
@@ -125,9 +153,17 @@ export function crearPersonaje(gltf: GLTF): Personaje {
       posturaAnterior = postura;
       mezclador.update(dt);
 
+      // Colgado y trepando: brazos arriba, agarrados al borde. Al trepar se
+      // bajan mientras el cuerpo sube (60 % del tiempo) y se inclina hacia
+      // delante al pasar encima del saliente.
+      const arriba = postura === 'colgado' ? 1 : postura === 'trepando' ? Math.max(1 - progreso / 0.6, 0) : 0;
+      // Se funde la pose de la animación con «brazos arriba».
+      if (arriba > 0) for (const b of brazos) b.hueso.quaternion.slerp(b.arriba, arriba);
+      const inclinado = postura === 'trepando' ? Math.sin(Math.PI * Math.min(Math.max((progreso - 0.4) / 0.6, 0), 1)) * 0.5 : 0;
+
       // Voltereta del doble salto y aplastamiento al aterrizar, encima de la animación.
       aplastado = Math.max(aplastado - dt * 6, 0);
-      cuerpo.rotation.x = postura === 'dobleSalto' ? progresoVoltereta * Math.PI * 2 : 0;
+      cuerpo.rotation.x = postura === 'dobleSalto' ? progreso * Math.PI * 2 : inclinado;
       cuerpo.scale.set(1 + aplastado * 0.15, 1 - aplastado * 0.25, 1 + aplastado * 0.15);
     },
     aterrizar(fuerza) {

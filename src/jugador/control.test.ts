@@ -165,3 +165,77 @@ describe('carrera', () => {
     expect(Math.hypot(e.vx, e.vz)).toBeGreaterThan(2);
   });
 });
+
+describe('agarrarse al borde y trepar (idea I3)', () => {
+  /** Un saliente demasiado alto para el salto (4,5 m) que empieza en x = 1 y sigue hacia +x. */
+  const ALTO = 4.5;
+  const CORNISA: Suelo = (x, _z, techo) => (x >= 1 && techo >= ALTO ? ALTO : techo >= 0 ? 0 : -Infinity);
+
+  /** Junto al borde, de cara al saliente, salta en vertical y espera a que pase algo. */
+  function saltarJuntoAlBorde(x = 0.6): Escalador {
+    const e = crearEscalador(x, 0, 0);
+    e.orientacion = Math.PI / 2; // mirando hacia +x
+    pasoEscalador(e, { ...QUIETO, saltar: true }, CORNISA, PASO);
+    for (let i = 0; i < 120 && !e.agarre && !e.enSuelo; i++) pasoEscalador(e, QUIETO, CORNISA, PASO);
+    return e;
+  }
+
+  it('si el saliente queda a la altura de las manos al caer, se agarra y se queda colgado', () => {
+    const e = saltarJuntoAlBorde();
+    expect(e.postura).toBe('colgado');
+    expect(e.y).toBeCloseTo(ALTO - C.alturaManos, 9);
+    expect(e.x).toBeCloseTo(1 - C.radio, 9); // el cuerpo justo delante del borde
+    // Sin tocar nada, sigue colgado.
+    pasos(e, 120, QUIETO, CORNISA);
+    expect(e.postura).toBe('colgado');
+    expect(e.y).toBeCloseTo(ALTO - C.alturaManos, 9);
+  });
+
+  it('con salto, trepa en el tiempo de trepar y acaba de pie encima', () => {
+    const e = saltarJuntoAlBorde();
+    pasoEscalador(e, { ...QUIETO, saltar: true }, CORNISA, PASO);
+    expect(e.postura).toBe('trepando');
+    pasos(e, Math.ceil(C.trepar / PASO) + 1, QUIETO, CORNISA);
+    expect(e.enSuelo).toBe(true);
+    expect(e.y).toBe(ALTO);
+    expect(e.x).toBeGreaterThan(1); // encima del saliente, no en el aire
+    expect(e.postura).toBe('quieto');
+  });
+
+  it('empujando hacia el saliente también trepa', () => {
+    const e = saltarJuntoAlBorde();
+    pasos(e, Math.ceil(C.trepar / PASO) + 2, { ...QUIETO, moverX: 1 }, CORNISA); // derecha = +x
+    expect(e.enSuelo).toBe(true);
+    expect(e.y).toBe(ALTO);
+  });
+
+  it('empujando hacia atrás se suelta, cae y no se vuelve a agarrar enseguida', () => {
+    const e = saltarJuntoAlBorde();
+    pasoEscalador(e, { ...QUIETO, moverX: -1 }, CORNISA, PASO);
+    expect(e.agarre).toBeNull();
+    expect(e.postura).toBe('cayendo');
+    for (let i = 0; i < 120 && !e.enSuelo; i++) pasoEscalador(e, QUIETO, CORNISA, PASO);
+    expect(e.enSuelo).toBe(true);
+    expect(e.y).toBe(0);
+  });
+
+  it('debajo del saliente (no en su borde) no se agarra', () => {
+    const e = saltarJuntoAlBorde(2);
+    expect(e.agarre).toBeNull();
+    expect(e.enSuelo).toBe(true);
+    expect(e.y).toBe(0);
+  });
+
+  it('cayendo muy rápido no se agarra: no salva una caída larga', () => {
+    const e = crearEscalador(0.6, 25, 0);
+    e.orientacion = Math.PI / 2;
+    e.enSuelo = false;
+    for (let i = 0; i < 200 && !e.enSuelo; i++) pasoEscalador(e, QUIETO, CORNISA, PASO);
+    expect(e.y).toBe(0);
+  });
+
+  it('al agarrarse se corta la caída: luego no cuenta como caída larga', () => {
+    const e = saltarJuntoAlBorde();
+    expect(e.alturaMaxima).toBeCloseTo(e.y, 9);
+  });
+});
