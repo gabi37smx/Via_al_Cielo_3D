@@ -7,7 +7,7 @@ Todo en **español**: código (variables, funciones, archivos), comentarios, com
 ## El stack
 
 - **Vite** sirve y compila. **TypeScript** estricto (`strict: true`). **Three.js** dibuja.
-- **Supabase Realtime** (red de la carrera) llega en la sesión 5; no se añade antes.
+- **Supabase Realtime** (`@supabase/supabase-js`) para la carrera: solo presencia y difusión en un canal por sala, sin tablas.
 - **Sin Rapier** de momento (decisión 019): el suelo y las colisiones son lógica propia en `src/reglas/torre.ts` y `src/jugador/control.ts`.
 - **Vitest** para las pruebas de la lógica y **Playwright** (Chromium sin pantalla) para la captura.
 - Sin motor de juego ni framework de interfaz (nada de React, Babylon.js, etc.).
@@ -25,7 +25,7 @@ src/
   bots/      cerebro del escalador del ordenador y simulación de partidas (lógica pura)
   mundo/     escena, luces, cámara, torre, escenarios (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
-  red/       salas, mensajes, interpolación (Supabase)
+  red/       protocolo.ts e interpolacion.ts (LÓGICA PURA) y sala.ts (Supabase)
   ui/        menús, HUD, ranking, contador de fps
 public/modelos/ escalador.glb (Kenney, CC0) y su textura
 herramientas/  captura.mjs, simular.ts
@@ -47,6 +47,7 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm run build` | Comprobar tipos y generar `dist/` para publicar |
 | `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms), `--ruta` (por defecto `"?semilla=1&panel=1"`) y `--teclas` (pulsar antes de capturar: `"Space:60,_:400,Space:60"` = doble salto; `_` espera) |
 | `npm run simular` | Simula subidas de la cueva con el escalador del ordenador y enseña una tabla (`npm run simular -- 50 20`: 50 torres, 20 murciélagos). **Después de tocar números de `config.ts` o `REGLAS`, simula** |
+| `npm run prueba-red` | **Prueba con dos navegadores** contra Supabase: se ven, misma semilla, anfitrión, posición del rival y relevo del anfitrión. Deja `capturas/red-ana.png` y `capturas/red-beto.png`. Necesita el `.env` |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |
 
 Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (empieza en el primer saliente desde esa altura), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla, altura y postura).
@@ -71,5 +72,5 @@ Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=
 - **Escenarios sin repetir**: una cueva oscura, una clara y luego exterior (decisión 024).
 - **No se recrea otro juego existente** (nombre, personajes, arte, música, niveles).
 - **La escala de metros y la velocidad máxima** (220 m por tramo, < 14 m/s): la API del ranking (`api-via-al-cielo`) las valida y rechazaría la partida.
-- **Nada de claves en el repositorio**: las de Supabase van en `.env` (ignorado por git), con un `.env.example` de muestra.
+- **Nada de claves en el repositorio**: `VITE_SUPABASE_URL` y `VITE_SUPABASE_CLAVE` (la *publishable*) van en `.env`, que git ignora. **La secret key no se usa nunca en el juego.** Sin `.env` el juego funciona en modo solo y la carrera sale desactivada.
 - No añadir dependencias nuevas sin apuntar por qué en las decisiones de `docs/diseno.md`.

@@ -28,11 +28,25 @@ Y abrir la dirección que sale (normalmente http://localhost:5173).
 | Girar la cámara | ratón (clic para capturarlo, Esc lo suelta) o Q/E | stick derecho |
 | Panel de datos | F3 | — |
 
+### Carrera (2-4 jugadores)
+
+En el menú, uno pulsa **Crear sala** y dicta el código de 4 letras que sale abajo a la izquierda; los demás lo escriben y pulsan **Unirse**. Todos escalan la misma torre y se ven en tiempo real.
+
+Necesita un proyecto de [Supabase](https://supabase.com) (gratis). Crea en la raíz un archivo `.env` con:
+
+```
+VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
+VITE_SUPABASE_CLAVE=sb_publishable_xxxxxxxx
+```
+
+(la *Publishable key*, nunca la secreta). Sin `.env` se puede jugar solo.
+
 Con `?semilla=1234` en la dirección se ve siempre la misma torre, y con `?altura=100` se empieza a esa altura.
 
 | Orden | Para qué |
 |---|---|
 | `npm test` | Pasar las pruebas |
 | `npm run build` | Comprobar tipos y generar `dist/` |
+| `npm run prueba-red` | Probar la carrera con dos navegadores automáticos |
 | `npm run simular` | Simular subidas con el escalador del ordenador (equilibrio) |
 | `npm run captura` | Guardar una captura del juego en `capturas/captura.png` (la primera vez: `npx playwright install chromium`) |
