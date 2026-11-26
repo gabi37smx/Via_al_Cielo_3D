@@ -231,3 +231,159 @@ body {
   color: #9fb3c8;
   font-size: 13px;
 }
+
+/* ---------- Menú de inicio ---------- */
+
+#menu {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 30%, #1d2a3f 0%, #0b0f17 70%);
+  color: #e6edf3;
+  font: 16px/1.5 system-ui, sans-serif;
+}
+
+#menu[hidden] {
+  display: none;
+}
+
+.menu-caja {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(360px, 90vw);
+  padding: 28px 32px;
+  border-radius: 12px;
+  background: #151c28;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.5);
+  text-align: center;
+}
+
+.menu-caja h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+}
+
+.menu-caja h1 span {
+  color: #f5c518;
+}
+
+.menu-caja h2 {
+  margin: 4px 0;
+  font-size: 15px;
+  color: #9fb3c8;
+  font-weight: 600;
+}
+
+.menu-carrera {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #2a3547;
+}
+
+.menu-carrera label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.menu-caja input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #2a3547;
+  border-radius: 6px;
+  background: #0d1117;
+  color: #e6edf3;
+  font: 16px system-ui, sans-serif;
+}
+
+.menu-codigo {
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+.menu-unirse {
+  display: flex;
+  gap: 8px;
+}
+
+.menu-caja button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #2b3a52;
+  color: #fff;
+  font: 600 16px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.menu-caja button.menu-solo {
+  background: #e8553a;
+}
+
+.menu-caja button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.menu-caja button:focus-visible,
+.menu-caja input:focus-visible {
+  outline: 3px solid #f5c518;
+  outline-offset: 2px;
+}
+
+.menu-error {
+  margin: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgb(255 77 77 / 0.15);
+  color: #ff8a8a;
+  font-size: 14px;
+}
+
+.menu-aviso {
+  margin: 0;
+  color: #9fb3c8;
+  font-size: 13px;
+}
+
+/* ---------- Lista de la sala ---------- */
+
+#sala {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  min-width: 190px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.55);
+  color: #e6edf3;
+  font: 14px/1.7 system-ui, sans-serif;
+  pointer-events: none;
+}
+
+#sala[hidden] {
+  display: none;
+}
+
+.sala-titulo {
+  color: #9fb3c8;
+  font-size: 12px;
+}
+
+.sala-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sala-fila b {
+  font-variant-numeric: tabular-nums;
+}

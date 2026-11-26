@@ -1,7 +1,12 @@
 import './estilo.css';
 import { CONFIG } from './config.ts';
 import { crearEscalador, pasoEscalador, type Escalador, type Ordenes } from './jugador/control.ts';
-import { cargarPersonaje } from './jugador/personaje.ts';
+import { cargarModeloEscalador, crearPersonaje } from './jugador/personaje.ts';
+import { ENVIOS_POR_SEGUNDO, generarCodigo, limpiarNombre, normalizarCodigo } from './red/protocolo.ts';
+import { ErrorSala, configuracionRed, unirseASala, type Sala } from './red/sala.ts';
+import { crearRivales } from './mundo/rivales.ts';
+import { crearListaJugadores } from './ui/jugadores.ts';
+import { mostrarMenu, type Eleccion } from './ui/menu.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
 import {
@@ -28,13 +33,43 @@ import { crearPanel } from './ui/panel.ts';
 
 /*
  * Parámetros de la dirección (útiles para probar y para la captura):
- *   ?semilla=1234   torre concreta (sin ella, una al azar)
+ *   ?semilla=1234   torre concreta (sin ella, una al azar) → modo solo sin menú
  *   ?altura=60      empieza en el primer saliente a partir de esa altura (m)
  *   ?panel=1        abre el panel de datos (también con F3)
+ *   ?solo=1         modo solo sin pasar por el menú
+ *   ?sala=ABCD&nombre=Ana   entra directamente en esa sala (la crea si está vacía)
  */
 const parametros = new URLSearchParams(location.search);
-const semilla = Number(parametros.get('semilla')) || Math.floor(Math.random() * 1e9);
 const alturaInicial = Number(parametros.get('altura')) || 0;
+const semillaPropia = Number(parametros.get('semilla')) || Math.floor(Math.random() * 1e9);
+const configRed = configuracionRed();
+const menu = document.querySelector<HTMLElement>('#menu')!;
+
+// 1 · ¿Solo o en una sala?
+let eleccion: Eleccion;
+const codigoUrl = normalizarCodigo(parametros.get('sala') ?? '');
+if (codigoUrl) eleccion = { modo: 'unirse', codigo: codigoUrl, nombre: limpiarNombre(parametros.get('nombre') ?? '') };
+else if (['semilla', 'altura', 'solo'].some((p) => parametros.has(p))) eleccion = { modo: 'solo' };
+else eleccion = await mostrarMenu(menu, configRed !== null);
+
+let sala: Sala | null = null;
+while (eleccion.modo !== 'solo') {
+  const codigo = eleccion.modo === 'crear' ? generarCodigo() : eleccion.codigo;
+  try {
+    menu.hidden = false;
+    menu.innerHTML = `<div class="menu-caja"><p>Conectando con la sala ${codigo}…</p></div>`;
+    if (!configRed) throw new ErrorSala('Falta configurar Supabase (.env)');
+    sala = await unirseASala(configRed, codigo, eleccion.nombre, semillaPropia);
+    menu.hidden = true;
+    break;
+  } catch (e) {
+    eleccion = await mostrarMenu(menu, configRed !== null, e instanceof Error ? e.message : String(e));
+  }
+}
+// En una sala, la torre es la del anfitrión.
+const semilla = sala?.semilla ?? semillaPropia;
+/** Puesto en la sala (0 = anfitrión): cada uno sale desde un sitio distinto. */
+const puesto = sala ? Math.max(sala.miembros().findIndex((m) => m.id === sala.yo.id), 0) : 0;
 
 const lienzo = document.querySelector<HTMLCanvasElement>('#lienzo')!;
 const mundo = crearEscena(lienzo);
@@ -61,16 +96,31 @@ mundo.escena.add(crearCueva(mundo.escena, roca), crearTorre(tramo, roca, piedra)
 
 // Dónde empieza: en el suelo junto al primer saliente, o en el saliente pedido con ?altura.
 const inicio = tramo.salientes.find((s) => s.y >= alturaInicial) ?? tramo.salientes[0]!;
-const anguloInicio = alturaInicial > 0 ? inicio.angulo : inicio.angulo - 0.7;
+const anguloInicio = alturaInicial > 0 ? inicio.angulo : inicio.angulo - 0.7 - puesto * 0.45;
 const salida = alturaInicial > 0
   ? { ...posicionSaliente(inicio), y: inicio.y }
   : { x: Math.cos(anguloInicio) * (RADIO_SALIENTES + 2), z: Math.sin(anguloInicio) * (RADIO_SALIENTES + 2), y: 0 };
 
 // El modelo del escalador se descarga (~270 kB): el juego arranca cuando llega.
-const personaje = await cargarPersonaje();
+const modelo = await cargarModeloEscalador();
+const personaje = crearPersonaje(modelo);
 const sombra = crearSombra();
 mundo.escena.add(personaje.raiz, sombra.mancha);
 const camara = crearCamaraTerceraPersona(mundo.camara, Math.PI / 2 - anguloInicio);
+
+// 2 · Los rivales de la sala: aparecen y desaparecen según la presencia de Supabase.
+const rivales = crearRivales(mundo.escena, modelo);
+const lista = sala ? crearListaJugadores(document.querySelector<HTMLElement>('#sala')!, sala.codigo) : null;
+if (sala) {
+  const s = sala;
+  rivales.sincronizar(s.miembros(), s.yo.id);
+  s.alCambiarMiembros((m) => rivales.sincronizar(m, s.yo.id));
+  s.alRecibirEstado((id, e) => rivales.recibir(id, e, performance.now()));
+  window.addEventListener('pagehide', () => void s.salir());
+}
+/** Cada cuántos pasos de lógica se envía el estado (60/10 = cada 6). */
+const PASOS_POR_ENVIO = Math.round(60 / ENVIOS_POR_SEGUNDO);
+let pasosDesdeEnvio = 0;
 
 let escalador: Escalador;
 let partida: Partida;
@@ -143,6 +193,21 @@ const bucle = crearBucle({
 
     const situacion = { x: escalador.x, y: escalador.y, z: escalador.z, aterrizaje: sucesos.aterrizaje };
     for (const j of pasoPartida(partida, situacion, peligros, paso)) atender(j);
+
+    // 10 veces por segundo, contar a la sala dónde estoy.
+    if (sala && ++pasosDesdeEnvio >= PASOS_POR_ENVIO) {
+      pasosDesdeEnvio = 0;
+      sala.enviarEstado({
+        t: performance.now(),
+        x: escalador.x,
+        y: escalador.y,
+        z: escalador.z,
+        orientacion: escalador.orientacion,
+        postura: escalador.postura,
+        rapidez: Math.hypot(escalador.vx, escalador.vz),
+        voltereta: 1 - escalador.voltereta / CONFIG.escalador.voltereta,
+      });
+    }
   },
   pintar(alfa, dtReal) {
     // Posición mezclada entre el paso anterior y el actual (movimiento suave).
@@ -165,6 +230,11 @@ const bucle = crearBucle({
     const t = partida.tiempo + alfa * (1 / 60);
     fragmentos.animar(t);
     murcielagos.actualizar(t);
+    rivales.pintar(performance.now(), dtReal);
+    if (sala && lista) {
+      const alturas = rivales.alturas().set(sala.yo.id, escalador.y);
+      lista.actualizar(sala.miembros(), sala.yo.id, sala.anfitrion()?.id, alturas);
+    }
 
     mundo.pintar(pintado);
     fps.contar(dtReal);
@@ -196,6 +266,18 @@ Object.assign(window, {
     },
     danar(n: number) {
       partida.vida = Math.max(partida.vida - n, 1);
+    },
+    /** Estado de la red: sala, quién está, quién es el anfitrión y dónde se ve a cada rival. */
+    get red() {
+      if (!sala) return null;
+      return {
+        codigo: sala.codigo,
+        semilla,
+        yo: sala.yo.nombre,
+        anfitrion: sala.anfitrion()?.nombre,
+        miembros: sala.miembros().map((m) => m.nombre),
+        rivales: rivales.vistos(),
+      };
     },
   },
 });

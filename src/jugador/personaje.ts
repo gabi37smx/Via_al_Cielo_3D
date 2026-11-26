@@ -8,7 +8,8 @@
  * voltereta del doble salto y el aplastamiento al aterrizar.
  */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as clonarConEsqueleto } from 'three/addons/utils/SkeletonUtils.js';
 import type { Postura } from './control.ts';
 
 export interface Personaje {
@@ -39,9 +40,25 @@ const ANIMACION: Record<Postura, string> = {
   dobleSalto: 'jump',
 };
 
-export async function cargarPersonaje(url = `${import.meta.env.BASE_URL}modelos/escalador.glb`): Promise<Personaje> {
-  const gltf = await new GLTFLoader().loadAsync(url);
-  const modelo = gltf.scene;
+let modeloCargado: Promise<GLTF> | undefined;
+
+/** Descarga el modelo UNA vez; todos los escaladores (tú y los rivales) lo comparten. */
+export function cargarModeloEscalador(url = `${import.meta.env.BASE_URL}modelos/escalador.glb`): Promise<GLTF> {
+  modeloCargado ??= new GLTFLoader().loadAsync(url);
+  return modeloCargado;
+}
+
+export async function cargarPersonaje(): Promise<Personaje> {
+  return crearPersonaje(await cargarModeloEscalador());
+}
+
+/**
+ * Un escalador nuevo a partir del modelo ya descargado. Se clona con
+ * `SkeletonUtils.clone`: con `clone()` normal todos los clones compartirían
+ * los huesos y se moverían a la vez (tropiezo de la sesión 3 del curso).
+ */
+export function crearPersonaje(gltf: GLTF): Personaje {
+  const modelo = clonarConEsqueleto(gltf.scene);
   modelo.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) {
       o.castShadow = true;

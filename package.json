@@ -10,9 +10,11 @@
     "comprobar": "tsc",
     "test": "vitest run",
     "captura": "node herramientas/captura.mjs",
-    "simular": "node herramientas/simular.ts"
+    "simular": "node herramientas/simular.ts",
+    "prueba-red": "node herramientas/prueba-red.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "three": "^0.187.0"
   },
   "devDependencies": {

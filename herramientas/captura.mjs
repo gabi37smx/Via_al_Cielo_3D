@@ -77,7 +77,8 @@ try {
   });
 
   await pagina.goto(new URL(op.ruta, url).href);
-  await pagina.waitForSelector('body[data-listo]', { timeout: 15000 });
+  // Listo cuando el juego ya ha pintado... o cuando enseña el menú (--ruta "?").
+  await pagina.waitForSelector('body[data-listo], #menu:not([hidden])', { timeout: 15000 });
   if (op.js) await pagina.evaluate(op.js);
   for (const par of op.teclas.split(',').filter(Boolean)) {
     const [tecla, ms = '100'] = par.trim().split(':');
