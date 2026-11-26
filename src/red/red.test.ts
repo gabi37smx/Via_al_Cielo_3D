@@ -7,13 +7,14 @@ import {
   decodificar,
   elegirAnfitrion,
   generarCodigo,
+  leerAspecto,
   limpiarNombre,
   normalizarCodigo,
   type EstadoRed,
   type Miembro,
 } from './protocolo.ts';
 
-const miembro = (id: string, unidoEn: number, semilla = 1): Miembro => ({ id, nombre: id, unidoEn, semilla });
+const miembro = (id: string, unidoEn: number, semilla = 1): Miembro => ({ id, nombre: id, unidoEn, semilla, aspecto: 'escalador' });
 const estado = (t: number, x: number, extra: Partial<EstadoRed> = {}): EstadoRed => ({
   t, x, y: 0, z: 0, orientacion: 0, postura: 'corriendo', rapidez: 6, voltereta: 0, ...extra,
 });
@@ -129,5 +130,16 @@ describe('interpolación', () => {
     i.anadir(estado(50, 99), 1010);
     i.anadir(estado(100, 99), 1020);
     expect(i.muestrear(5000)!.x).toBe(1);
+  });
+});
+
+describe('aspecto (escalador o escaladora)', () => {
+  it('lee los dos aspectos que existen', () => {
+    expect(leerAspecto('escalador')).toBe('escalador');
+    expect(leerAspecto('escaladora')).toBe('escaladora');
+  });
+
+  it('lo que no vale (versión antigua sin aspecto, URL mal escrita, datos raros) es escalador', () => {
+    for (const raro of [undefined, null, '', 'ESCALADORA', 'robot', 3, {}]) expect(leerAspecto(raro)).toBe('escalador');
   });
 });

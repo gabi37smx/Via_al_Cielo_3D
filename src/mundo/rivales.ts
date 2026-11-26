@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { crearPersonaje, type Personaje } from '../jugador/personaje.ts';
 import { Interpolador } from '../red/interpolacion.ts';
-import type { EstadoRed, Miembro } from '../red/protocolo.ts';
+import type { Aspecto, EstadoRed, Miembro } from '../red/protocolo.ts';
 
 /** Colores de los nombres por orden de llegada a la sala. */
 export const COLORES_JUGADOR = ['#f5c518', '#4fc3f7', '#ff7a8a', '#9ccc65'] as const;
@@ -41,7 +41,7 @@ interface Rival {
   ultimo: EstadoRed | null;
 }
 
-export function crearRivales(escena: THREE.Scene, modelo: GLTF) {
+export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>) {
   const rivales = new Map<string, Rival>();
 
   return {
@@ -56,7 +56,8 @@ export function crearRivales(escena: THREE.Scene, modelo: GLTF) {
       }
       miembros.forEach((m, i) => {
         if (m.id === yo || rivales.has(m.id)) return;
-        const personaje = crearPersonaje(modelo);
+        // Cada rival con el aspecto que eligió (va en su presencia).
+        const personaje = crearPersonaje(modelos[m.aspecto]);
         personaje.raiz.add(etiqueta(m.nombre, COLORES_JUGADOR[i % COLORES_JUGADOR.length]!));
         personaje.raiz.visible = false; // hasta que llegue su primer estado
         escena.add(personaje.raiz);
@@ -85,6 +86,7 @@ export function crearRivales(escena: THREE.Scene, modelo: GLTF) {
     vistos() {
       return [...rivales.values()].map((r) => ({
         nombre: r.miembro.nombre,
+        aspecto: r.miembro.aspecto,
         visible: r.personaje.raiz.visible,
         x: r.ultimo?.x ?? NaN,
         y: r.ultimo?.y ?? NaN,

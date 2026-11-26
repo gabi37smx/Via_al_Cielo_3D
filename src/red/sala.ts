@@ -20,6 +20,8 @@ import {
   elegirAnfitrion,
   ordenarMiembros,
   type EstadoRed,
+  leerAspecto,
+  type Aspecto,
   type Miembro,
 } from './protocolo.ts';
 
@@ -58,23 +60,30 @@ function idAleatorio(): string {
 
 /** Convierte lo que guarda Supabase en la presencia en nuestra lista de miembros. */
 function leerPresencia(canal: RealtimeChannel): Miembro[] {
-  const estado = canal.presenceState<{ nombre: string; unidoEn: number; semilla: number }>();
+  const estado = canal.presenceState<{ nombre: string; unidoEn: number; semilla: number; aspecto?: string }>();
   const miembros: Miembro[] = [];
   for (const [id, metas] of Object.entries(estado)) {
     const m = metas[0];
     if (m && typeof m.nombre === 'string' && Number.isFinite(m.unidoEn) && Number.isFinite(m.semilla)) {
-      miembros.push({ id, nombre: m.nombre, unidoEn: m.unidoEn, semilla: m.semilla });
+      // Sin aspecto (una versión anterior del juego): escalador.
+      miembros.push({ id, nombre: m.nombre, unidoEn: m.unidoEn, semilla: m.semilla, aspecto: leerAspecto(m.aspecto) });
     }
   }
   return ordenarMiembros(miembros);
 }
 
-export async function unirseASala(config: ConfigRed, codigo: string, nombre: string, semillaPropia: number): Promise<Sala> {
+export async function unirseASala(
+  config: ConfigRed,
+  codigo: string,
+  nombre: string,
+  semillaPropia: number,
+  aspecto: Aspecto,
+): Promise<Sala> {
   const cliente = createClient(config.url, config.clave, {
     auth: { persistSession: false },
     realtime: { params: { eventsPerSecond: 30 } },
   });
-  const yo: Miembro = { id: idAleatorio(), nombre, unidoEn: Date.now(), semilla: semillaPropia };
+  const yo: Miembro = { id: idAleatorio(), nombre, unidoEn: Date.now(), semilla: semillaPropia, aspecto };
   const canal = cliente.channel(`sala:${codigo}`, {
     config: { broadcast: { self: false, ack: false }, presence: { key: yo.id } },
   });
@@ -103,7 +112,7 @@ export async function unirseASala(config: ConfigRed, codigo: string, nombre: str
     });
     canal.subscribe((estado) => {
       if (estado === 'SUBSCRIBED') {
-        void canal.track({ nombre: yo.nombre, unidoEn: yo.unidoEn, semilla: yo.semilla });
+        void canal.track({ nombre: yo.nombre, unidoEn: yo.unidoEn, semilla: yo.semilla, aspecto: yo.aspecto });
       } else if (estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT') {
         clearTimeout(plazo);
         rechazar(new ErrorSala('Supabase ha rechazado la conexión con la sala'));
@@ -128,7 +137,7 @@ export async function unirseASala(config: ConfigRed, codigo: string, nombre: str
   const semilla = elegirAnfitrion(miembros)?.semilla ?? semillaPropia;
   if (semilla !== yo.semilla) {
     yo.semilla = semilla;
-    void canal.track({ nombre: yo.nombre, unidoEn: yo.unidoEn, semilla });
+    void canal.track({ nombre: yo.nombre, unidoEn: yo.unidoEn, semilla, aspecto: yo.aspecto });
   }
 
   return {

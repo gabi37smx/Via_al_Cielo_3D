@@ -50,21 +50,22 @@ try {
   const url = servidor.resolvedUrls?.local[0];
   navegador = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 
-  async function jugador(nombre) {
+  async function jugador(nombre, aspecto) {
     const contexto = await navegador.newContext({ viewport: { width: 960, height: 600 } });
     const pagina = await contexto.newPage();
     pagina.on('pageerror', (e) => console.log(`[${nombre} excepción] ${e.message}`));
     pagina.on('console', (m) => {
       if (m.type() === 'error' && !m.text().includes('GL Driver')) console.log(`[${nombre} error] ${m.text()}`);
     });
-    await pagina.goto(new URL(`?sala=${codigo}&nombre=${nombre}`, url).href);
+    await pagina.goto(new URL(`?sala=${codigo}&nombre=${nombre}&aspecto=${aspecto}`, url).href);
     return { contexto, pagina };
   }
 
   console.log(`Sala de prueba: ${codigo}`);
-  const ana = await jugador('Ana');
+  // Ana sube con la escaladora y Beto con el escalador: cada uno tiene que ver al otro como se eligió.
+  const ana = await jugador('Ana', 'escaladora');
   await ana.pagina.waitForSelector('body[data-listo]', { timeout: 30000 });
-  const beto = await jugador('Beto');
+  const beto = await jugador('Beto', 'escalador');
   await beto.pagina.waitForSelector('body[data-listo]', { timeout: 30000 });
 
   // 2 · Se ven los dos.
@@ -74,6 +75,8 @@ try {
   comprobar(redBeto?.miembros.join() === 'Ana,Beto', `Beto ve a los dos: ${redBeto?.miembros.join(', ')}`);
   comprobar(redAna?.semilla === redBeto?.semilla, `Misma torre (semilla ${redAna?.semilla} y ${redBeto?.semilla})`);
   comprobar(redAna?.anfitrion === 'Ana' && redBeto?.anfitrion === 'Ana', 'Ana es la anfitriona para los dos');
+  comprobar(redBeto?.rivales[0]?.aspecto === 'escaladora', `Beto ve a Ana como escaladora (${redBeto?.rivales[0]?.aspecto})`);
+  comprobar(redAna?.rivales[0]?.aspecto === 'escalador', `Ana ve a Beto como escalador (${redAna?.rivales[0]?.aspecto})`);
 
   // 3 · Beto corre y Ana le ve donde está.
   await beto.pagina.keyboard.down('KeyA');

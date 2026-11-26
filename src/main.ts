@@ -1,12 +1,12 @@
 import './estilo.css';
 import { CONFIG } from './config.ts';
 import { crearEscalador, pasoEscalador, progresoPostura, type Escalador, type Ordenes } from './jugador/control.ts';
-import { cargarModeloEscalador, crearPersonaje } from './jugador/personaje.ts';
-import { ENVIOS_POR_SEGUNDO, generarCodigo, limpiarNombre, normalizarCodigo } from './red/protocolo.ts';
+import { cargarModelos, crearPersonaje } from './jugador/personaje.ts';
+import { ENVIOS_POR_SEGUNDO, generarCodigo, leerAspecto, limpiarNombre, normalizarCodigo } from './red/protocolo.ts';
 import { ErrorSala, configuracionRed, unirseASala, type Sala } from './red/sala.ts';
 import { crearRivales } from './mundo/rivales.ts';
 import { crearListaJugadores } from './ui/jugadores.ts';
-import { mostrarMenu, type Eleccion } from './ui/menu.ts';
+import { aspectoGuardado, mostrarMenu, type Eleccion } from './ui/menu.ts';
 import { crearPantallaCompleta } from './ui/pantallaCompleta.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
@@ -39,6 +39,7 @@ import { crearPanel } from './ui/panel.ts';
  *   ?panel=1        abre el panel de datos (también con F3)
  *   ?solo=1         modo solo sin pasar por el menú
  *   ?sala=ABCD&nombre=Ana   entra directamente en esa sala (la crea si está vacía)
+ *   ?aspecto=escaladora     sube la escaladora (sin él, el último elegido en el menú)
  */
 const parametros = new URLSearchParams(location.search);
 const alturaInicial = Number(parametros.get('altura')) || 0;
@@ -55,6 +56,11 @@ if (codigoUrl) eleccion = { modo: 'unirse', codigo: codigoUrl, nombre: limpiarNo
 else if (['semilla', 'altura', 'solo'].some((p) => parametros.has(p))) eleccion = { modo: 'solo' };
 else eleccion = await mostrarMenu(menu, configRed !== null);
 
+/** Escalador o escaladora: el de la dirección (?aspecto=) o el último elegido en el menú. */
+function elegirAspecto() {
+  return parametros.has('aspecto') ? leerAspecto(parametros.get('aspecto')) : aspectoGuardado();
+}
+
 let sala: Sala | null = null;
 while (eleccion.modo !== 'solo') {
   const codigo = eleccion.modo === 'crear' ? generarCodigo() : eleccion.codigo;
@@ -62,7 +68,7 @@ while (eleccion.modo !== 'solo') {
     menu.hidden = false;
     menu.innerHTML = `<div class="menu-caja"><p>Conectando con la sala ${codigo}…</p></div>`;
     if (!configRed) throw new ErrorSala('Falta configurar Supabase (.env)');
-    sala = await unirseASala(configRed, codigo, eleccion.nombre, semillaPropia);
+    sala = await unirseASala(configRed, codigo, eleccion.nombre, semillaPropia, elegirAspecto());
     menu.hidden = true;
     break;
   } catch (e) {
@@ -104,15 +110,17 @@ const anguloInicio = alturaInicial > 0 ? inicio.angulo : enSuelo.angulo;
 const salida = alturaInicial > 0 ? { ...posicionSaliente(inicio), y: inicio.y } : { x: enSuelo.x, z: enSuelo.z, y: 0 };
 
 // El modelo del escalador se descarga (~270 kB): el juego arranca cuando llega.
-const modelo = await cargarModeloEscalador();
-const personaje = crearPersonaje(modelo);
+// Se cargan los dos: el tuyo y el de los rivales, que pueden ser de otro aspecto.
+const modelos = await cargarModelos();
+const aspecto = elegirAspecto();
+const personaje = crearPersonaje(modelos[aspecto]);
 const sombra = crearSombra();
 mundo.escena.add(personaje.raiz, sombra.mancha);
 // La cámara empieza entre el escalador y el centro del pozo, mirando a la pared.
 const camara = crearCamaraTerceraPersona(mundo.camara, giroHaciaPared(salida.x, salida.z));
 
 // 2 · Los rivales de la sala: aparecen y desaparecen según la presencia de Supabase.
-const rivales = crearRivales(mundo.escena, modelo);
+const rivales = crearRivales(mundo.escena, modelos);
 const lista = sala ? crearListaJugadores(document.querySelector<HTMLElement>('#sala')!, sala.codigo) : null;
 if (sala) {
   const s = sala;
