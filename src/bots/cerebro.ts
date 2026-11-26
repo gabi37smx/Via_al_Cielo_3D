@@ -5,11 +5,11 @@
  * no pueda. Sirve para simular partidas (equilibrio) y, en la sesión 6, para
  * los rivales de la carrera.
  *
- * Estrategia sencilla: ir hacia el centro del siguiente saliente, saltar
+ * Estrategia sencilla: ir hacia el punto más cercano del siguiente saliente, saltar
  * cuando está a tiro y usar el doble salto si se queda corto.
  */
 import type { Escalador, Ordenes } from '../jugador/control.ts';
-import { RADIO_PARED, puntoEnAngulo, type Tramo } from '../reglas/torre.ts';
+import { RADIO_CAMINO, RADIO_PARED, puntoEnAngulo, type Tramo } from '../reglas/torre.ts';
 
 /** Distancia horizontal (m) a la que salta hacia el siguiente saliente. */
 const DISTANCIA_SALTO = 2.6;
@@ -29,8 +29,13 @@ export interface Objetivo {
 export function siguienteObjetivo(e: Escalador, tramo: Tramo, apoyo: number): Objetivo {
   const s = tramo.salientes.find((x) => x.y > apoyo + 0.3);
   if (s) {
-    // Centro del saliente, un poco hacia la pared (más margen al caer).
-    return { ...puntoEnAngulo(s.angulo, RADIO_PARED - 0.9), y: s.y };
+    // El punto del saliente más cercano, sin acercarse a sus bordes (en una
+    // cornisa de 6 m no tiene sentido ir al medio), y un poco hacia la pared.
+    const margen = Math.min(0.6, s.ancho / 2 - 0.1);
+    const mitad = (s.ancho / 2 - margen) / RADIO_CAMINO;
+    const delante = Math.atan2(Math.sin(Math.atan2(e.z, e.x) - s.angulo), Math.cos(Math.atan2(e.z, e.x) - s.angulo));
+    const angulo = s.angulo + Math.min(Math.max(delante, -mitad), mitad);
+    return { ...puntoEnAngulo(angulo, RADIO_PARED - Math.min(0.9, s.fondo - 0.4)), y: s.y };
   }
   // El rellano da la vuelta entera a la pared: el punto que tiene delante.
   return { ...puntoEnAngulo(Math.atan2(e.z, e.x), RADIO_PARED - 1), y: tramo.rellano };
@@ -64,8 +69,10 @@ function decidir(e: Escalador, o: Objetivo): Ordenes {
   let saltar = false;
   if (e.enSuelo) {
     saltar = d < DISTANCIA_SALTO;
-  } else if (e.saltosAereos > 0 && e.vy < 0 && e.y < o.y + 0.3 && d > 0.6) {
-    saltar = true; // se queda corto: doble salto
+  } else if (e.saltosAereos > 0 && e.vy < 0 && e.y < o.y) {
+    // Se queda corto: doble salto. Aunque ya esté justo debajo (d ≈ 0): en
+    // un saliente alto llega a su sitio antes que a su altura.
+    saltar = true;
   }
   return { moverX, moverY, saltar, giroCamara: 0 };
 }

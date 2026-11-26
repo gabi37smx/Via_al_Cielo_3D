@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { crearAzar } from './azar.ts';
 import {
-  DISTANCIA_MAX,
-  DISTANCIA_MIN,
-  GIRO_MAX,
-  GIRO_MIN,
+  METROS_ENTRE_DESCANSILLOS,
   METROS_POR_TRAMO,
   RADIO_PARED,
   RADIO_RELLANO,
-  SEPARACION_MAX,
-  SEPARACION_MIN,
+  SUBIDA_MAX,
+  SUBIDA_MIN,
+  TIPOS,
   alturaSuelo,
   generarTramo,
+  huecoEntre,
   posicionSaliente,
   puntoDeSalida,
+  type TipoSaliente,
 } from './torre.ts';
 
 const SEMILLAS = Array.from({ length: 60 }, (_, i) => i * 7919 + 1);
@@ -53,42 +53,81 @@ describe('generarTramo', () => {
     expect(t.rellano).toBe(3 * METROS_POR_TRAMO);
   });
 
-  it('todos los huecos verticales miden 2-3 m, también suelo → primero y último → rellano', () => {
+  it('cada saliente sube lo que dice su tipo, y el último hueco hasta el rellano mide 2-3 m', () => {
     for (const s of SEMILLAS) {
       for (const n of TRAMOS) {
         const t = generarTramo(s, n);
-        const alturas = [t.base, ...t.salientes.map((x) => x.y), t.rellano];
-        for (let i = 1; i < alturas.length; i++) {
-          const hueco = alturas[i]! - alturas[i - 1]!;
-          expect(hueco).toBeGreaterThanOrEqual(SEPARACION_MIN - MARGEN);
-          expect(hueco).toBeLessThanOrEqual(SEPARACION_MAX + MARGEN);
+        let y = t.base;
+        for (const x of t.salientes) {
+          const subida = x.y - y;
+          expect(subida).toBeGreaterThanOrEqual(SUBIDA_MIN - MARGEN);
+          expect(subida).toBeLessThanOrEqual(TIPOS[x.tipo].subida[1] + MARGEN);
+          y = x.y;
+        }
+        const ultimo = t.rellano - y;
+        expect(ultimo).toBeGreaterThanOrEqual(2 - MARGEN);
+        expect(ultimo).toBeLessThanOrEqual(3 + MARGEN);
+      }
+    }
+    expect(SUBIDA_MAX).toBeLessThanOrEqual(4.2); // doble salto (5,5 m) o salto + trepar (5,2 m)
+  });
+
+  it('el hueco entre bordes seguidos es el de su tipo (se puede saltar) y siempre gira hacia el mismo lado', () => {
+    for (const s of SEMILLAS) {
+      const { salientes } = generarTramo(s, 0);
+      for (let i = 1; i < salientes.length; i++) {
+        const b = salientes[i]!;
+        const hueco = huecoEntre(salientes[i - 1]!, b);
+        expect(hueco).toBeGreaterThanOrEqual(TIPOS[b.tipo].hueco[0] - MARGEN);
+        expect(hueco).toBeLessThanOrEqual(TIPOS[b.tipo].hueco[1] + MARGEN);
+      }
+    }
+  });
+
+  it('las medidas de cada saliente son las de su tipo', () => {
+    for (const s of SEMILLAS) {
+      for (const x of generarTramo(s, 0).salientes) {
+        const m = TIPOS[x.tipo];
+        for (const [valor, [min, max]] of [[x.ancho, m.ancho], [x.fondo, m.fondo], [x.grosor, m.grosor]] as const) {
+          expect(valor).toBeGreaterThanOrEqual(min);
+          expect(valor).toBeLessThanOrEqual(max);
         }
       }
     }
   });
 
-  it('el giro entre salientes seguidos va siempre hacia el mismo lado y dentro de sus límites', () => {
+  it('hay variedad: salen todos los tipos y la mitad o más son normales', () => {
+    const cuenta: Record<TipoSaliente, number> = { normal: 0, bajo: 0, alto: 0, cornisa: 0, descansillo: 0 };
+    let total = 0;
+    for (const s of SEMILLAS) {
+      for (const x of generarTramo(s, 0).salientes) {
+        cuenta[x.tipo]++;
+        total++;
+      }
+    }
+    for (const n of Object.values(cuenta)) expect(n).toBeGreaterThan(0);
+    expect(cuenta.normal / total).toBeGreaterThan(0.5);
+  });
+
+  it('nunca hay dos altos seguidos', () => {
     for (const s of SEMILLAS) {
       const { salientes } = generarTramo(s, 0);
       for (let i = 1; i < salientes.length; i++) {
-        let giro = salientes[i]!.angulo - salientes[i - 1]!.angulo;
-        if (giro < 0) giro += Math.PI * 2;
-        expect(giro).toBeGreaterThanOrEqual(GIRO_MIN - MARGEN);
-        expect(giro).toBeLessThanOrEqual(GIRO_MAX + MARGEN);
+        expect(salientes[i - 1]!.tipo === 'alto' && salientes[i]!.tipo === 'alto').toBe(false);
       }
     }
   });
 
-  it('la distancia en horizontal entre centros seguidos es de 2,2-3,4 m (se puede saltar)', () => {
+  it('hay un descansillo cada 40 m más, como mucho, un saliente alto y lo que sube el propio descansillo', () => {
     for (const s of SEMILLAS) {
-      const { salientes } = generarTramo(s, 0);
-      for (let i = 1; i < salientes.length; i++) {
-        const a = posicionSaliente(salientes[i - 1]!);
-        const b = posicionSaliente(salientes[i]!);
-        const d = Math.hypot(b.x - a.x, b.z - a.z);
-        expect(d).toBeGreaterThanOrEqual(DISTANCIA_MIN - MARGEN);
-        expect(d).toBeLessThanOrEqual(DISTANCIA_MAX + MARGEN);
+      const t = generarTramo(s, 0);
+      let ultimo = t.base;
+      for (const x of t.salientes) {
+        if (x.tipo !== 'descansillo') continue;
+        expect(x.y - ultimo).toBeLessThanOrEqual(METROS_ENTRE_DESCANSILLOS + SUBIDA_MAX + TIPOS.descansillo.subida[1] + MARGEN);
+        ultimo = x.y;
       }
+      expect(ultimo).toBeGreaterThan(t.rellano - METROS_ENTRE_DESCANSILLOS - 20);
     }
   });
 
@@ -109,10 +148,11 @@ describe('generarTramo', () => {
       const { x, z } = posicionSaliente(s);
       const r = Math.hypot(x, z);
       expect(r).toBeLessThan(RADIO_PARED);
-      expect(r).toBeGreaterThan(RADIO_PARED - 2.5);
-      // Pegado a la pared se pisa; 3 m hacia dentro, ya no.
+      expect(r).toBeGreaterThan(RADIO_PARED - 1.6);
+      // Pegado a la pared se pisa; más allá de su fondo, ya no.
       expect(alturaSuelo(t, (x / r) * (RADIO_PARED - 0.4), (z / r) * (RADIO_PARED - 0.4), s.y + 0.01)).toBe(s.y);
-      expect(alturaSuelo(t, (x / r) * (RADIO_PARED - 3), (z / r) * (RADIO_PARED - 3), s.y + 0.01)).toBeLessThan(s.y);
+      const fuera = RADIO_PARED - s.fondo - 0.3;
+      expect(alturaSuelo(t, (x / r) * fuera, (z / r) * fuera, s.y + 0.01)).toBeLessThan(s.y);
     }
   });
 
@@ -144,7 +184,7 @@ describe('generarTramo', () => {
     }
   });
 
-  it('un tramo tiene entre 73 y 110 salientes (220 m / 2-3 m)', () => {
+  it('un tramo tiene entre 73 y 110 salientes: ni un paseo ni eterno', () => {
     for (const s of SEMILLAS) {
       const n = generarTramo(s, 0).salientes.length;
       expect(n).toBeGreaterThanOrEqual(73);
