@@ -7,11 +7,12 @@
  */
 import * as THREE from 'three';
 import {
-  FONDO_SALIENTE,
+  FONDO_CAJA,
   GROSOR_SALIENTE,
   METROS_POR_TRAMO,
+  RADIO_CENTRO_CAJA,
   RADIO_COLUMNA,
-  RADIO_SALIENTES,
+  RADIO_RELLANO,
   type Tramo,
 } from '../reglas/torre.ts';
 import { materialRoca, type TexturaRoca } from './texturas.ts';
@@ -53,12 +54,12 @@ export function crearTorre(tramo: Tramo, roca: TexturaRoca, piedra: TexturaRoca)
   const ejeY = new THREE.Vector3(0, 1, 0);
 
   tramo.salientes.forEach((s, i) => {
-    // Un poco metido en la columna para que no se vea una rendija.
-    const radio = RADIO_SALIENTES - 0.1;
+    // Las medidas de la caja salen de reglas/torre.ts: lo que se ve = lo que se pisa.
+    const radio = RADIO_CENTRO_CAJA;
     posicion.set(Math.cos(s.angulo) * radio, s.y - GROSOR_SALIENTE / 2, Math.sin(s.angulo) * radio);
     // Girar la caja para que su eje z apunte hacia fuera de la columna.
     giro.setFromAxisAngle(ejeY, Math.PI / 2 - s.angulo);
-    escala.set(s.ancho, GROSOR_SALIENTE, FONDO_SALIENTE + 0.2);
+    escala.set(s.ancho, GROSOR_SALIENTE, FONDO_CAJA);
     salientes.setMatrixAt(i, matriz.compose(posicion, giro, escala));
   });
   salientes.instanceMatrix.needsUpdate = true;
@@ -67,7 +68,7 @@ export function crearTorre(tramo: Tramo, roca: TexturaRoca, piedra: TexturaRoca)
 
   // El rellano de arriba: un anillo completo, se llega desde cualquier lado.
   const rellano = new THREE.Mesh(
-    new THREE.CylinderGeometry(RADIO_COLUMNA + FONDO_SALIENTE, RADIO_COLUMNA + FONDO_SALIENTE, GROSOR_SALIENTE, 48),
+    new THREE.CylinderGeometry(RADIO_RELLANO, RADIO_RELLANO, GROSOR_SALIENTE, 48),
     materialRoca(piedra, 3, 0.3),
   );
   rellano.position.y = tramo.rellano - GROSOR_SALIENTE / 2;

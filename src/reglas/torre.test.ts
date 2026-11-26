@@ -4,8 +4,10 @@ import {
   GIRO_MAX,
   GIRO_MIN,
   METROS_POR_TRAMO,
+  RADIO_RELLANO,
   SEPARACION_MAX,
   SEPARACION_MIN,
+  alturaSuelo,
   generarTramo,
   posicionSaliente,
 } from './torre.ts';
@@ -84,6 +86,27 @@ describe('generarTramo', () => {
         expect(d).toBeLessThan(3.6);
       }
     }
+  });
+
+  it('alturaSuelo: encima de un saliente da su altura; fuera, el suelo', () => {
+    const t = generarTramo(5, 0);
+    const s = t.salientes[10]!;
+    const { x, z } = posicionSaliente(s);
+    expect(alturaSuelo(t, x, z, s.y + 1)).toBe(s.y);
+    // Por debajo de su cara de arriba no cuenta (se atraviesa desde abajo).
+    expect(alturaSuelo(t, x, z, s.y - 0.01)).toBeLessThan(s.y);
+    // Lejos de la columna solo queda el suelo de la cueva.
+    expect(alturaSuelo(t, 15, 0, 100)).toBe(0);
+  });
+
+  it('alturaSuelo: el rellano es un anillo completo alrededor de la columna', () => {
+    const t = generarTramo(5, 0);
+    for (let a = 0; a < Math.PI * 2; a += 0.5) {
+      const x = Math.cos(a) * (RADIO_RELLANO - 0.3);
+      const z = Math.sin(a) * (RADIO_RELLANO - 0.3);
+      expect(alturaSuelo(t, x, z, t.rellano + 1)).toBe(t.rellano);
+    }
+    expect(alturaSuelo(t, RADIO_RELLANO + 1, 0, t.rellano + 1)).toBeLessThan(t.rellano);
   });
 
   it('un tramo tiene entre 73 y 110 salientes (220 m / 2-3 m)', () => {

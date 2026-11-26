@@ -8,6 +8,7 @@ import type * as THREE from 'three';
 export interface DatosPanel {
   semilla: number;
   altura: number;
+  postura: string;
 }
 
 export function crearPanel(elemento: HTMLElement, renderer: THREE.WebGLRenderer, visible = false) {
@@ -29,6 +30,7 @@ export function crearPanel(elemento: HTMLElement, renderer: THREE.WebGLRenderer,
         `triángulos ${triangles.toLocaleString('es-ES')}`,
         `semilla    ${datos.semilla}`,
         `altura     ${datos.altura.toFixed(1)} m`,
+        `postura    ${datos.postura}`,
       ].join('\n');
     },
   };

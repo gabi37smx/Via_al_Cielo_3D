@@ -19,8 +19,9 @@ Es la versión 3D de *Vía al Cielo* (2D, canvas, v73). De aquel juego se conser
 
 ## Cómo se juega
 
-- **Mover:** WASD o flechas, relativo a la cámara. **Saltar:** espacio; en el aire, otra vez = **doble salto**.
-- **Cámara:** tercera persona, detrás y algo por encima, sigue con un pequeño retardo; el ratón la gira.
+- **Mover:** WASD o flechas, relativo a la cámara. **Saltar:** espacio; en el aire, otra vez = **doble salto** (con voltereta). Con **mando**: stick izquierdo, stick derecho y botón A.
+- **Cámara:** tercera persona, detrás y algo por encima, sigue con un pequeño retardo; el ratón la gira (clic para capturarlo, Esc lo suelta) y también Q/E. Si la columna queda en medio, se acerca al escalador.
+- **Salientes de un sentido:** se atraviesan desde abajo al saltar y frenan al caer encima, como en el 2D.
 - **Sombra redonda** bajo el escalador siempre visible: en 3D es lo que permite calcular dónde vas a caer.
 - **El mundo:** salientes apilados en espiral alrededor de una columna central (la «torre»). Cada 220 m cambia el tramo y el escenario.
 - **Fragmentos de código:** 3 por tramo. Coger los 3 devuelve vida.
@@ -44,7 +45,9 @@ Igual que el original: subir lo más alto posible. Vida a 0 → fin de partida �
 |---|---|---|
 | Unidad | 20 px = 1 m | 1 unidad Three.js = 1 m |
 | Tramo / pantalla | 220 m | 220 m (la API lo valida: `METROS_POR_PANTALLA`) |
-| Altura del salto | ~8 m | ~3,5 m + ~2 m el doble salto |
+| Altura del salto | ~8 m | 3,5 m + 2 m el doble salto (gravedad 28 m/s² → sale a 14 m/s) |
+| Carrera | — | 6 m/s; acelera a 45 m/s², frena a 60 m/s²; en el aire, 55 % de control |
+| Ayudas al salto | — | tiempo coyote 0,1 s y salto guardado 0,12 s |
 | Separación entre salientes | — | 2-3 m en vertical, 30-50° de giro (2-3,4 m entre centros) |
 | Columna / salientes | — | columna de 3 m de radio; salientes de 1,6-2,2 × 2,2 m; ~90 por tramo |
 | Final de cada tramo | — | rellano: anillo completo alrededor de la columna |
@@ -122,6 +125,9 @@ Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y 
 - **013** · Cada tramo **acaba en un rellano** (anillo completo): une un tramo con el siguiente desde cualquier lado y garantiza que también el último hueco mide 2-3 m. Las pruebas lo comprueban con 60 semillas.
 - **014** · **Texturas pintadas en canvas** (color, normales y rugosidad del mismo ruido periódico): nada que descargar ni acreditar. Los salientes usan una piedra **más clara** que la columna para que se vea de un vistazo dónde se puede pisar.
 - **015** · El sol proyecta sombras solo en una caja de 28 m que **sigue a la cámara**: una sombra que cubriera los 220 m saldría borrosa.
+- **016** · El **escalador se construye con piezas por código** (cápsula, casco con linterna, gafas, mochila con cuerda) en vez de cargar un modelo como el robot del curso: es propio, no hay que acreditar nada y está lejos de Minecraft. La animación también es por código y **la decide la postura** (quieto, corriendo, subiendo, cayendo, doble salto), no las teclas: servirá igual para los rivales de la red.
+- **017** · En vez del «suelo imaginario» del curso, el escalador ya **se posa sobre los salientes** con `alturaSuelo` (lógica pura, la misma caja que se dibuja): sin eso no se puede probar una torre. Los salientes son **de un sentido**. Se decide en la sesión 4 si Rapier sigue haciendo falta.
+- **018** · El movimiento (`src/jugador/control.ts`) es lógica pura con pruebas: altura de los saltos, doble salto, coyote, salto guardado, diagonal, frenado y columna.
 
 ## Pendiente
 
