@@ -1,7 +1,7 @@
 import './estilo.css';
 import { CONFIG } from './config.ts';
 import { crearEscalador, pasoEscalador, type Escalador, type Ordenes } from './jugador/control.ts';
-import { crearPersonaje } from './jugador/personaje.ts';
+import { cargarPersonaje } from './jugador/personaje.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
 import {
@@ -66,7 +66,8 @@ const salida = alturaInicial > 0
   ? { ...posicionSaliente(inicio), y: inicio.y }
   : { x: Math.cos(anguloInicio) * (RADIO_SALIENTES + 2), z: Math.sin(anguloInicio) * (RADIO_SALIENTES + 2), y: 0 };
 
-const personaje = crearPersonaje();
+// El modelo del escalador se descarga (~270 kB): el juego arranca cuando llega.
+const personaje = await cargarPersonaje();
 const sombra = crearSombra();
 mundo.escena.add(personaje.raiz, sombra.mancha);
 const camara = crearCamaraTerceraPersona(mundo.camara, Math.PI / 2 - anguloInicio);

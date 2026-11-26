@@ -1,13 +1,14 @@
 /*
- * El escalador, hecho con piezas sencillas (nada descargado y nada de
- * Minecraft): cuerpo en cápsula, cabeza, casco con linterna, gafas y mochila
- * con cuerda. Mide 1,7 m y mira hacia +z.
+ * El escalador: el «trabajador» de Kenney Mini Characters (CC0), con casco,
+ * brazos, piernas y sus propias animaciones (ver docs/creditos.md).
  *
- * La animación es por código y la decide la POSTURA (quieto, corriendo,
- * subiendo, cayendo, doble salto), no las teclas: así servirá igual para el
- * jugador, los rivales de la red y los del ordenador.
+ * La animación la decide la POSTURA (quieto, corriendo, subiendo, cayendo,
+ * doble salto), no las teclas: así servirá igual para el jugador, los
+ * rivales de la red y los del ordenador. Por encima del modelo se añaden la
+ * voltereta del doble salto y el aplastamiento al aterrizar.
  */
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Postura } from './control.ts';
 
 export interface Personaje {
@@ -20,46 +21,74 @@ export interface Personaje {
   aterrizar(fuerza: number): void;
 }
 
-/** Altura del centro de giro del cuerpo (para la voltereta). */
+/** Altura del escalador (m). */
+const ALTURA = 1.7;
+/** Altura del centro de giro de la voltereta (m). */
 const CENTRO = 0.85;
+/** Por debajo de esta rapidez (m/s) anda en vez de correr. */
+const RAPIDEZ_ANDAR = 3;
+/** Duración del fundido entre animaciones (s). */
+const FUNDIDO = 0.15;
 
-export function crearPersonaje(color = 0xe8553a): Personaje {
+/** Qué animación del modelo corresponde a cada postura. */
+const ANIMACION: Record<Postura, string> = {
+  quieto: 'idle',
+  corriendo: 'sprint',
+  subiendo: 'jump',
+  cayendo: 'fall',
+  dobleSalto: 'jump',
+};
+
+export async function cargarPersonaje(url = `${import.meta.env.BASE_URL}modelos/escalador.glb`): Promise<Personaje> {
+  const gltf = await new GLTFLoader().loadAsync(url);
+  const modelo = gltf.scene;
+  modelo.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) {
+      o.castShadow = true;
+      // Three.js lo descartaría por la caja de la postura de reposo y
+      // desaparecería en los bordes (tropiezo de la sesión 3 del curso).
+      o.frustumCulled = false;
+    }
+  });
+
+  // Medir con el esqueleto aplicado (`true`) y escalar a 1,7 m con los pies en y = 0.
+  modelo.updateMatrixWorld(true);
+  const caja = new THREE.Box3().setFromObject(modelo, true);
+  const escala = ALTURA / (caja.max.y - caja.min.y);
+  modelo.scale.setScalar(escala);
+  modelo.position.y = -caja.min.y * escala - CENTRO;
+
   const raiz = new THREE.Group();
   raiz.name = 'escalador';
-  const cuerpo = new THREE.Group(); // se estira, se inclina y da la voltereta
+  const cuerpo = new THREE.Group(); // gira en la voltereta y se aplasta al aterrizar
   cuerpo.position.y = CENTRO;
+  cuerpo.add(modelo);
   raiz.add(cuerpo);
 
-  const mat = (c: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
-    new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...extra });
-  const pieza = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number) => {
-    const p = new THREE.Mesh(geo, m);
-    p.position.set(x, y, z);
-    p.castShadow = true;
-    cuerpo.add(p);
-    return p;
-  };
+  // Animaciones: una acción por clip; se pasa de una a otra con un fundido.
+  const mezclador = new THREE.AnimationMixer(modelo);
+  const acciones = new Map<string, THREE.AnimationAction>();
+  for (const clip of gltf.animations) acciones.set(clip.name, mezclador.clipAction(clip));
+  for (const nombre of ['jump']) {
+    // El salto se hace una vez y se queda en la última pose.
+    const a = acciones.get(nombre);
+    if (a) {
+      a.setLoop(THREE.LoopOnce, 1);
+      a.clampWhenFinished = true;
+    }
+  }
+  let actual: THREE.AnimationAction | undefined;
+  let posturaAnterior: Postura | undefined;
 
-  // Cuerpo (los pies quedan en y = 0).
-  pieza(new THREE.CapsuleGeometry(0.3, 0.55, 6, 14), mat(color), 0, -0.25, 0);
-  // Cabeza, casco amarillo y linterna encendida.
-  pieza(new THREE.SphereGeometry(0.24, 18, 12), mat(0xf1c9a5), 0, 0.6, 0);
-  pieza(new THREE.SphereGeometry(0.26, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xf5c518, { roughness: 0.4 }), 0, 0.63, 0);
-  const linterna = pieza(new THREE.CylinderGeometry(0.06, 0.07, 0.08, 12), mat(0xfff2c0, { emissive: 0xffd27a, emissiveIntensity: 2 }), 0, 0.74, 0.22);
-  linterna.rotation.x = Math.PI / 2;
-  // Gafas.
-  pieza(new THREE.BoxGeometry(0.32, 0.08, 0.06), mat(0x1d2430, { roughness: 0.2, metalness: 0.4 }), 0, 0.58, 0.21);
-  // Mochila con la cuerda enrollada.
-  pieza(new THREE.BoxGeometry(0.42, 0.5, 0.2), mat(0x5a3d2b), 0, -0.05, -0.3);
-  const cuerda = pieza(new THREE.TorusGeometry(0.14, 0.045, 8, 18), mat(0x2f8f5b), 0, -0.02, -0.43);
-  cuerda.rotation.y = Math.PI / 2;
+  function cambiarA(nombre: string, reiniciar = false) {
+    const nueva = acciones.get(nombre);
+    if (!nueva || (nueva === actual && !reiniciar)) return;
+    nueva.reset().play();
+    if (actual && actual !== nueva) nueva.crossFadeFrom(actual, FUNDIDO, false);
+    actual = nueva;
+  }
 
-  // Estado de la animación.
-  let tiempo = 0;
   let aplastado = 0;
-  let inclinacionActual = 0;
-  const escala = new THREE.Vector3(1, 1, 1);
-  const escalaObjetivo = new THREE.Vector3();
 
   return {
     raiz,
@@ -68,46 +97,21 @@ export function crearPersonaje(color = 0xe8553a): Personaje {
       raiz.rotation.y = orientacion;
     },
     animar(postura, rapidez, progresoVoltereta, dt) {
-      tiempo += dt;
-      aplastado = Math.max(aplastado - dt * 6, 0);
-      const suave = 1 - Math.exp(-15 * dt);
-      let alturaCentro = CENTRO;
-      let inclinacion = 0;
-
-      switch (postura) {
-        case 'quieto':
-          escalaObjetivo.set(1, 1 + Math.sin(tiempo * 2.5) * 0.02, 1); // respira
-          break;
-        case 'corriendo': {
-          const f = Math.min(rapidez / 6, 1);
-          escalaObjetivo.set(1, 1, 1);
-          alturaCentro += Math.abs(Math.sin(tiempo * 12)) * 0.08 * f; // bota al correr
-          inclinacion = 0.18 * f; // se inclina hacia delante
-          break;
-        }
-        case 'subiendo':
-          escalaObjetivo.set(0.92, 1.1, 0.92); // se estira
-          break;
-        case 'cayendo':
-          escalaObjetivo.set(1.04, 0.96, 1.04);
-          inclinacion = -0.1;
-          break;
-        case 'dobleSalto':
-          escalaObjetivo.set(0.95, 1.05, 0.95);
-          break;
+      let nombre = ANIMACION[postura];
+      if (postura === 'corriendo' && rapidez < RAPIDEZ_ANDAR) nombre = 'walk';
+      // El doble salto vuelve a empezar la animación de salto.
+      cambiarA(nombre, postura === 'dobleSalto' && posturaAnterior !== 'dobleSalto');
+      if (actual && (nombre === 'walk' || nombre === 'sprint')) {
+        // Que los pies acompañen a la velocidad real.
+        actual.timeScale = Math.max(rapidez / (nombre === 'walk' ? 2 : 6), 0.5);
       }
+      posturaAnterior = postura;
+      mezclador.update(dt);
 
-      // Aplastamiento al aterrizar (se suma a la postura).
-      escalaObjetivo.y *= 1 - aplastado * 0.25;
-      escalaObjetivo.x *= 1 + aplastado * 0.15;
-      escalaObjetivo.z *= 1 + aplastado * 0.15;
-
-      escala.lerp(escalaObjetivo, suave);
-      cuerpo.scale.copy(escala);
-      cuerpo.position.y += (alturaCentro - cuerpo.position.y) * suave;
-      inclinacionActual += (inclinacion - inclinacionActual) * suave;
-      // En el doble salto, voltereta completa hacia delante encima de la inclinación.
-      cuerpo.rotation.x = inclinacionActual + (postura === 'dobleSalto' ? progresoVoltereta * Math.PI * 2 : 0);
+      // Voltereta del doble salto y aplastamiento al aterrizar, encima de la animación.
+      aplastado = Math.max(aplastado - dt * 6, 0);
+      cuerpo.rotation.x = postura === 'dobleSalto' ? progresoVoltereta * Math.PI * 2 : 0;
+      cuerpo.scale.set(1 + aplastado * 0.15, 1 - aplastado * 0.25, 1 + aplastado * 0.15);
     },
     aterrizar(fuerza) {
       aplastado = Math.min(Math.max(fuerza, 0.3), 1);
