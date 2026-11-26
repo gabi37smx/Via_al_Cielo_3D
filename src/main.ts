@@ -14,6 +14,7 @@ import { REGLAS, generarFragmentos, generarMurcielagos, type Jugada } from './re
 import { crearCorredor, pasoCorredor, type Corredor } from './reglas/carrera.ts';
 import { crearCarreraEnSala } from './modos/carrera.ts';
 import { crearPantallaCarrera } from './ui/carrera.ts';
+import { crearMenuPausa } from './ui/pausa.ts';
 import { alturaSuelo, generarTramo, posicionSaliente, puntoDeSalida } from './reglas/torre.ts';
 import { crearCamaraTerceraPersona, giroHaciaPared } from './mundo/camara.ts';
 import { crearCueva } from './mundo/cueva.ts';
@@ -81,7 +82,10 @@ const entrada = crearEntrada(lienzo);
 const fps = crearContadorFps(document.querySelector<HTMLElement>('#fps')!);
 const panel = crearPanel(document.querySelector<HTMLElement>('#panel')!, mundo.renderer, parametros.has('panel'));
 const hud = crearHud(document.querySelector<HTMLElement>('#hud')!);
-const fin = crearPantallaFin(document.querySelector<HTMLElement>('#fin')!, reiniciar);
+const fin = crearPantallaFin(document.querySelector<HTMLElement>('#fin')!, () => {
+  pausa.bloquear(false);
+  reiniciar();
+});
 entrada.alPulsar('F3', panel.alternar);
 window.addEventListener('resize', mundo.redimensionar);
 
@@ -163,6 +167,21 @@ const carrera = sala
     })
   : null;
 
+// 4 · Menú de pausa (P). Solo: para el juego. Carrera: el juego sigue (los
+//     demás siguen subiendo), pero tu escalador se queda quieto.
+const pausa = crearMenuPausa(document.querySelector<HTMLElement>('#pausa')!, {
+  enCarrera: sala !== null,
+  alAbrir: () => {},
+  alCerrar: () => {},
+  async alSalir() {
+    try {
+      await sala?.salir();
+    } finally {
+      location.href = location.pathname; // sin parámetros: vuelve el menú de inicio
+    }
+  },
+});
+
 /** Lo que se ve y se oye reacciona a las jugadas de las reglas. */
 function atender(j: Jugada) {
   switch (j.tipo) {
@@ -185,6 +204,7 @@ function atender(j: Jugada) {
       // En la carrera no se acaba: se reaparece (lo lleva pasoCorredor).
       if (carrera) break;
       jugador.reaparecerEn = 0;
+      pausa.bloquear(true);
       const p = jugador.partida;
       const recordNuevo = guardarRecord(p.alturaMaxima);
       fin.mostrar({ altura: p.alturaMaxima, fragmentos: p.recogidos.length, segundos: p.tiempo, record: leerRecord(), recordNuevo });
@@ -200,7 +220,12 @@ const pintado = { x: 0, y: 0, z: 0 };
 
 const bucle = crearBucle({
   actualizar(paso) {
-    const m = entrada.leer();
+    const m = entrada.leer(); // se lee siempre: lo pulsado en la pausa no se guarda para luego
+    if (!sala && pausa.abierto()) {
+      // En pausa no avanza nada; «anterior» = ahora para que no tiemble al pintar.
+      Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
+      return;
+    }
     camara.girar(
       -m.ratonX * CC.sensibilidadRaton - m.girarX * CC.velocidadGiro * paso,
       m.ratonY * CC.sensibilidadRaton + m.girarY * CC.velocidadGiro * paso,
@@ -214,7 +239,7 @@ const bucle = crearBucle({
     carrera?.antesDelPaso(paso);
     // Quieto en la espera y la cuenta atrás de la carrera, y con la partida
     // acabada en solo (pero sigue cayendo si estaba en el aire).
-    const quieto = carrera ? !carrera.sePuedeMover() : jugador.partida.terminada;
+    const quieto = carrera ? !carrera.sePuedeMover() || pausa.abierto() : jugador.partida.terminada;
     const ordenes = quieto
       ? { ...QUIETO, giroCamara: camara.giro }
       : { moverX: m.moverX, moverY: m.moverY, saltar: m.saltar, giroCamara: camara.giro };
