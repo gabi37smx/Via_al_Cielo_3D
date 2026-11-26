@@ -1,6 +1,6 @@
 import './estilo.css';
 import { CONFIG } from './config.ts';
-import { crearEscalador, pasoEscalador, type Escalador, type Ordenes } from './jugador/control.ts';
+import { crearEscalador, pasoEscalador, progresoPostura, type Escalador, type Ordenes } from './jugador/control.ts';
 import { cargarModeloEscalador, crearPersonaje } from './jugador/personaje.ts';
 import { ENVIOS_POR_SEGUNDO, generarCodigo, limpiarNombre, normalizarCodigo } from './red/protocolo.ts';
 import { ErrorSala, configuracionRed, unirseASala, type Sala } from './red/sala.ts';
@@ -209,7 +209,7 @@ const bucle = crearBucle({
         orientacion: escalador.orientacion,
         postura: escalador.postura,
         rapidez: Math.hypot(escalador.vx, escalador.vz),
-        voltereta: 1 - escalador.voltereta / CONFIG.escalador.voltereta,
+        voltereta: progresoPostura(escalador),
       });
     }
   },
@@ -220,12 +220,7 @@ const bucle = crearBucle({
     pintado.z = anterior.z + (escalador.z - anterior.z) * alfa;
 
     personaje.colocar(pintado.x, pintado.y, pintado.z, escalador.orientacion);
-    personaje.animar(
-      escalador.postura,
-      Math.hypot(escalador.vx, escalador.vz),
-      1 - escalador.voltereta / CONFIG.escalador.voltereta,
-      dtReal,
-    );
+    personaje.animar(escalador.postura, Math.hypot(escalador.vx, escalador.vz), progresoPostura(escalador), dtReal);
     // Parpadea mientras es invulnerable.
     personaje.raiz.visible = partida.invulnerable === 0 || Math.floor(partida.invulnerable * 12) % 2 === 0;
     sombra.colocar(pintado.x, suelo(pintado.x, pintado.z, pintado.y + 0.05), pintado.z, pintado.y);
