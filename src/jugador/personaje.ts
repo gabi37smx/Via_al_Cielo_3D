@@ -1,7 +1,6 @@
 /*
- * El escalador: `character-male-b` de Kenney Mini Characters (CC0), con
- * brazos, piernas y sus propias animaciones (ver docs/creditos.md), más el
- * casco de escalada y el arnés de `equipo.ts`.
+ * El escalador: el «trabajador» de Kenney Mini Characters (CC0), con casco,
+ * brazos, piernas y sus propias animaciones (ver docs/creditos.md).
  *
  * La animación la decide la POSTURA (quieto, corriendo, subiendo, cayendo,
  * doble salto), no las teclas: así servirá igual para el jugador, los
@@ -11,7 +10,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Postura } from './control.ts';
-import { ponerEquipo } from './equipo.ts';
 
 export interface Personaje {
   raiz: THREE.Group;
@@ -59,8 +57,6 @@ export async function cargarPersonaje(url = `${import.meta.env.BASE_URL}modelos/
   const escala = ALTURA / (caja.max.y - caja.min.y);
   modelo.scale.setScalar(escala);
   modelo.position.y = -caja.min.y * escala - CENTRO;
-  // El equipo, después de medir (si no, el casco contaría en la altura).
-  if (!ponerEquipo(modelo)) console.warn('El modelo no tiene los huesos esperados: sin casco ni arnés');
 
   const raiz = new THREE.Group();
   raiz.name = 'escalador';

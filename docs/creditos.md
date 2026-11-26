@@ -4,9 +4,9 @@ Todo modelo, textura, sonido o fuente que no se haya hecho para este juego se ap
 
 | Recurso | Dónde se usa | Origen | Licencia |
 |---|---|---|---|
-| Escalador: `character-male-b` (modelo, textura `colormap.png` y animaciones) | `public/modelos/escalador.glb` y `public/modelos/Textures/colormap.png` | [Mini Characters 2.0](https://kenney.nl/assets/mini-characters-1), de Kenney ([www.kenney.nl](https://www.kenney.nl)) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (copia en `public/modelos/LICENCIA-kenney.txt`) |
+| Escalador: `character-worker` (modelo, textura `colormap.png` y animaciones) | `public/modelos/escalador.glb` y `public/modelos/Textures/colormap.png` | [Mini Characters 2.0](https://kenney.nl/assets/mini-characters-1), de Kenney ([www.kenney.nl](https://www.kenney.nl)) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (copia en `public/modelos/LICENCIA-kenney.txt`) |
 
-Hecho para el juego (sin licencias de terceros): casco de escalada y arnés del escalador, texturas de roca (canvas), fragmentos de código, murciélagos, cueva y torre.
+Hecho para el juego (sin licencias de terceros): texturas de roca (canvas), fragmentos de código, murciélagos, cueva y torre.
 
 ## Librerías
 
