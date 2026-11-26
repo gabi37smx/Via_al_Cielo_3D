@@ -5,6 +5,10 @@
  *
  *   npm run captura
  *   node herramientas/captura.mjs [--salida capturas/x.png] [--ancho 1280] [--alto 720] [--espera 500]
+ *                                 [--ruta "?semilla=1&altura=60&panel=1"]
+ *
+ * `--ruta` se añade a la dirección del juego: sirve para elegir la torre
+ * (semilla), mirar a otra altura o abrir el panel de datos.
  *
  * Arranca su propio servidor de Vite en un puerto libre (no hace falta tener
  * `npm run dev` abierto), espera a que el juego avise de que ya ha pintado
@@ -30,6 +34,7 @@ const { values: op } = parseArgs({
     ancho: { type: 'string', default: '1280' },
     alto: { type: 'string', default: '720' },
     espera: { type: 'string', default: '500' },
+    ruta: { type: 'string', default: '?semilla=1&panel=1' },
   },
 });
 
@@ -63,7 +68,7 @@ try {
     console.log(`[navegador excepción] ${e.message}`);
   });
 
-  await pagina.goto(url);
+  await pagina.goto(new URL(op.ruta, url).href);
   await pagina.waitForSelector('body[data-listo]', { timeout: 15000 });
   await pagina.waitForTimeout(Number(op.espera));
 

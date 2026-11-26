@@ -12,6 +12,23 @@ body {
   height: 100%;
 }
 
+#panel {
+  position: fixed;
+  top: 40px;
+  left: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.55);
+  color: #e6edf3;
+  font: 13px/1.6 ui-monospace, Consolas, monospace;
+  pointer-events: none;
+}
+
+#panel[hidden] {
+  display: none;
+}
+
 #fps {
   position: fixed;
   top: 8px;

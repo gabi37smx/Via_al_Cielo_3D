@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RADIO_CUEVA } from './cueva.ts';
 
 /** 1 unidad de Three.js = 1 metro (ver docs/diseno.md). */
 export interface Escena {
@@ -7,68 +8,75 @@ export interface Escena {
   escena: THREE.Scene;
   camara: THREE.PerspectiveCamera;
   controles: OrbitControls;
-  cubo: THREE.Mesh;
+  /** Altura (m) a la que mira la cámara. */
+  readonly altura: number;
+  /** Sube o baja la cámara y lo que mira, sin girarla. */
+  moverVista(dy: number): void;
   /** Ajusta el tamaño del dibujo y la proporción de la cámara a la ventana. */
   redimensionar(): void;
   pintar(): void;
 }
 
-export function crearEscena(lienzo: HTMLCanvasElement): Escena {
+export function crearEscena(lienzo: HTMLCanvasElement, alturaInicial = 1.5): Escena {
   // 1 · Renderer: dibuja en el <canvas>, con sombras.
   const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoftShadowMap ya no existe en three 0.187
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
   const escena = new THREE.Scene();
-  escena.background = new THREE.Color(0x0d1117);
 
-  // 2 · Cámara en perspectiva, algo por encima y mirando al centro.
-  const camara = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
-  camara.position.set(4, 3.5, 6);
+  // 2 · Cámara en perspectiva, fuera de la columna y mirando a su eje.
+  const camara = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
+  camara.position.set(10, alturaInicial + 4, 7);
 
   const controles = new OrbitControls(camara, lienzo);
-  controles.target.set(0, 0.5, 0);
+  controles.target.set(0, alturaInicial, 0);
   controles.enableDamping = true;
+  controles.enablePan = false;
+  controles.minDistance = 6;
+  controles.maxDistance = RADIO_CUEVA - 4; // que no atraviese las paredes
   controles.update();
 
-  // 3 · Luz de relleno: que las caras en sombra no queden negras.
-  escena.add(new THREE.HemisphereLight(0xbcd7ff, 0x2a2018, 0.8));
+  // 3 · Luz de relleno, muy baja: en una cueva casi todo es sombra. Si es
+  //     fuerte, tapa las sombras del sol (tropiezo de la sesión 2 del curso).
+  escena.add(new THREE.HemisphereLight(0x8fa3c8, 0x3a2e22, 0.9));
 
-  // 4 · Sol direccional que proyecta sombras.
-  const sol = new THREE.DirectionalLight(0xffffff, 2.2);
-  sol.position.set(5, 10, 4);
+  // 4 · «Sol»: la luz que entra por la grieta de arriba. Proyecta sombras,
+  //     pero solo en una caja de 28 m alrededor de la cámara: la torre mide
+  //     220 m y una sombra que la cubriera entera saldría borrosa. Por eso el
+  //     sol SIGUE a la cámara al subir.
+  const sol = new THREE.DirectionalLight(0xdfe8ff, 3.2);
   sol.castShadow = true;
   sol.shadow.mapSize.set(1024, 1024);
-  sol.shadow.camera.left = -8;
-  sol.shadow.camera.right = 8;
-  sol.shadow.camera.top = 8;
-  sol.shadow.camera.bottom = -8;
+  sol.shadow.camera.left = sol.shadow.camera.bottom = -14;
+  sol.shadow.camera.right = sol.shadow.camera.top = 14;
   sol.shadow.camera.near = 1;
-  sol.shadow.camera.far = 30;
-  escena.add(sol);
+  sol.shadow.camera.far = 70;
+  sol.shadow.bias = -0.0005;
+  sol.shadow.normalBias = 0.03;
+  escena.add(sol, sol.target);
 
-  // Suelo que recibe la sombra + rejilla de 1 m para ver la escala.
-  const suelo = new THREE.Mesh(
-    new THREE.PlaneGeometry(20, 20),
-    new THREE.MeshStandardMaterial({ color: 0x1f2933, roughness: 1 }),
-  );
-  suelo.rotation.x = -Math.PI / 2;
-  suelo.receiveShadow = true;
-  escena.add(suelo);
+  // 5 · Farol: luz puntual cálida cerca de lo que se mira (más adelante la
+  //     llevará el escalador). Sin sombras: las puntuales con sombra cuestan 6 pasadas.
+  const farol = new THREE.PointLight(0xffb36b, 40, 18, 2);
+  escena.add(farol);
 
-  const rejilla = new THREE.GridHelper(20, 20, 0x5b6b7a, 0x33404c);
-  rejilla.position.y = 0.001; // un pelo por encima para que no parpadee con el suelo
-  escena.add(rejilla);
+  function colocarLuces() {
+    const t = controles.target;
+    // Inclinado ~45°: si cae vertical solo ilumina las caras de arriba.
+    sol.position.set(t.x + 16, t.y + 24, t.z + 12);
+    sol.target.position.copy(t);
+    farol.position.set(camara.position.x * 0.5, t.y + 2, camara.position.z * 0.5);
+  }
 
-  // El cubo de prueba: 1 m de lado, apoyado sobre el suelo.
-  const cubo = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshStandardMaterial({ color: 0xf2a541, roughness: 0.5 }),
-  );
-  cubo.position.y = 0.5;
-  cubo.castShadow = true;
-  escena.add(cubo);
+  function moverVista(dy: number) {
+    const nueva = Math.max(controles.target.y + dy, 1.5); // no bajar del suelo
+    const real = nueva - controles.target.y;
+    controles.target.y += real;
+    camara.position.y += real;
+  }
 
   function redimensionar() {
     const ancho = lienzo.clientWidth;
@@ -80,9 +88,21 @@ export function crearEscena(lienzo: HTMLCanvasElement): Escena {
 
   function pintar() {
     controles.update();
+    colocarLuces();
     renderer.render(escena, camara);
   }
 
   redimensionar();
-  return { renderer, escena, camara, controles, cubo, redimensionar, pintar };
+  return {
+    renderer,
+    escena,
+    camara,
+    controles,
+    get altura() {
+      return controles.target.y;
+    },
+    moverVista,
+    redimensionar,
+    pintar,
+  };
 }

@@ -21,6 +21,8 @@ npm run dev
 
 Y abrir la dirección que sale (normalmente http://localhost:5173).
 
+De momento hay vista libre: **W/S** o **flechas** suben y bajan por la torre, el **ratón** gira la cámara, la **rueda** acerca y **F3** abre el panel de datos. Con `?semilla=1234` en la dirección se ve siempre la misma torre.
+
 | Orden | Para qué |
 |---|---|
 | `npm test` | Pasar las pruebas |
