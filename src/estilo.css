@@ -1,0 +1,25 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+#lienzo {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#fps {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.55);
+  color: #e6edf3;
+  font: 13px/1.6 ui-monospace, Consolas, monospace;
+  pointer-events: none;
+}
