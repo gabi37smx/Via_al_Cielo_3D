@@ -27,7 +27,8 @@ src/
   fisicas/   mundo Rapier, cápsula del escalador
   red/       salas, mensajes, interpolación (Supabase)
   ui/        menús, HUD, ranking, contador de fps
-herramientas/  captura.mjs
+public/modelos/ escalador.glb (Kenney, CC0) y su textura
+herramientas/  captura.mjs, simular.ts
 docs/          diseno.md, creditos.md, sesiones/
 ```
 
@@ -65,7 +66,9 @@ Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=
 
 ## Lo que no se toca
 
-- **Nada de Minecraft**: ni Steve, ni su aspecto, ni sus texturas o sonidos. El escalador es propio.
+- **Nada de Minecraft**: ni Steve, ni su aspecto, ni sus texturas o sonidos.
+- **Recursos de fuera, solo con licencia libre (CC0)** y apuntados en `docs/creditos.md`. Nada de Mixamo (decisión 023).
+- **Escenarios sin repetir**: una cueva oscura, una clara y luego exterior (decisión 024).
 - **No se recrea otro juego existente** (nombre, personajes, arte, música, niveles).
 - **La escala de metros y la velocidad máxima** (220 m por tramo, < 14 m/s): la API del ranking (`api-via-al-cielo`) las valida y rechazaría la partida.
 - **Nada de claves en el repositorio**: las de Supabase van en `.env` (ignorado por git), con un `.env.example` de muestra.

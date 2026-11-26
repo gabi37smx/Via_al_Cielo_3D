@@ -48,3 +48,11 @@ El curso añade aquí Rapier. En este juego no hace falta (decisión 019): cajas
 - **Los murciélagos no molestaban** (0,2 golpes por subida): volaban por fuera del camino del escalador. Se acercaron a la columna.
 - **La invulnerabilidad no se acababa nunca del todo**: 1,5 − 90 × (1/60) no da 0 exacto en coma flotante y el golpe siguiente no llegaba. Lo encontró una prueba; ahora lo que queda por debajo de una milésima cuenta como 0.
 - **Los murciélagos no se veían venir** a tamaño real (1,3 m de alas) en la oscuridad: se dibujan 1,5 veces más grandes, con ojos rojos que brillan.
+
+## Cambios tras probar el hito 1 (26-nov)
+
+Gabi lo probó y pidió dos cosas:
+
+1. **Un escalador más real, con brazos y piernas.** Propuso Mixamo; se eligió el «trabajador» de **Kenney Mini Characters 2.0 (CC0)** porque Mixamo pide cuenta de Adobe, conversión desde FBX y su licencia no deja repartir los archivos en un repositorio público (decisión 023). Trae `idle`, `walk`, `sprint`, `jump` y `fall`; se carga con `GLTFLoader` y la postura elige la animación con un fundido de 0,15 s. Las llamadas de dibujo bajan de 29 a 17.
+   - Tropiezo: la web de Kenney da el enlace de descarga con JavaScript; hubo que pedirlo igual que el botón «Continue without donating».
+2. **Escenarios sin repetir**: una cueva oscura, una clara (la grieta) y luego exterior (decisión 024). Queda en el diseño; se construyen en la sesión 7.

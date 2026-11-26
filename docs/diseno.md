@@ -23,7 +23,16 @@ Es la versión 3D de *Vía al Cielo* (2D, canvas, v73). De aquel juego se conser
 - **Cámara:** tercera persona, detrás y algo por encima, sigue con un pequeño retardo; el ratón la gira (clic para capturarlo, Esc lo suelta) y también Q/E. Si la columna queda en medio, se acerca al escalador.
 - **Salientes de un sentido:** se atraviesan desde abajo al saltar y frenan al caer encima, como en el 2D.
 - **Sombra redonda** bajo el escalador siempre visible: en 3D es lo que permite calcular dónde vas a caer.
-- **El mundo:** salientes apilados en espiral alrededor de una columna central (la «torre»). Cada 220 m cambia el tramo y el escenario.
+- **El mundo:** salientes apilados en espiral alrededor de una columna central (la «torre»). Cada 220 m cambia el tramo y el escenario, **sin repetir ninguno**:
+
+  | Tramo | Altura | Escenario | Peligro |
+  |---|---|---|---|
+  | 1 | 0-220 m | **Cueva oscura** | murciélagos |
+  | 2 | 220-440 m | **Grieta**: cueva clara, con luz que entra desde arriba | murciélagos (menos) |
+  | 3 | 440-660 m | **Aire libre**: se sale al exterior, cielo y nubes | águilas |
+  | 4… | 660 m → | **Ciudades** (1-2 en la versión 1.0) | según la ciudad |
+
+  Solo hay **una cueva oscura y una clara**; después siempre se está fuera (en el 2D la cueva oscura volvía a salir y se repetía demasiado).
 - **Fragmentos de código:** 3 por tramo. Coger los 3 devuelve vida.
 - **Vida:** empiezas con 100 %. Animal que te toca → pierdes vida y eres invulnerable 1,5 s. Caída de más de 90 m → −30 %. No se regenera sola.
 
@@ -134,6 +143,8 @@ Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y 
 - **020** · Las reglas de la partida (`src/reglas/partida.ts`) son lógica pura: reciben dónde está el escalador y devuelven **jugadas** (fragmento, vida extra, golpe, caída, fin); el HUD y la pantalla final reaccionan a ellas.
 - **021** · Un **escalador del ordenador** (`src/bots/cerebro.ts`) da las mismas órdenes que el teclado y pasa por el mismo movimiento. Con él se **simula** la cueva (`npm run simular`) y las pruebas vigilan el equilibrio: las 20 torres se suben enteras, a menos de 14 m/s, cogiendo los fragmentos, con 1-4 golpes de murciélago. En la sesión 6 será el rival del ordenador.
 - **022** · El récord se guarda en el navegador (`localStorage`); el ranking mundial llega en la 1.0. «Volver a jugar» repite la misma torre.
+- **023** · **El escalador es el «trabajador» de Kenney Mini Characters 2.0 (CC0)** (cambia la 016): cuerpo entero con casco, brazos y piernas y sus animaciones (`idle`, `walk`, `sprint`, `jump`, `fall`), 260 kB y ~900 triángulos. Más real y menos código que construir extremidades a mano. **Mixamo descartado**: pide cuenta de Adobe, hay que convertir de FBX y su licencia no deja repartir los archivos sueltos (el repositorio es público); el curso lo descartó por lo mismo. La animación sigue la postura; encima se mantienen la voltereta del doble salto y el aplastamiento.
+- **024** · **Escenarios sin repetir** (petición de Gabi tras probar el hito 1): cueva oscura → grieta (cueva clara) → aire libre → ciudades. Una sola cueva oscura y una sola clara.
 
 ## Pendiente
 
