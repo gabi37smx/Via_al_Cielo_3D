@@ -21,7 +21,14 @@ npm run dev
 
 Y abrir la dirección que sale (normalmente http://localhost:5173).
 
-De momento hay vista libre: **W/S** o **flechas** suben y bajan por la torre, el **ratón** gira la cámara, la **rueda** acerca y **F3** abre el panel de datos. Con `?semilla=1234` en la dirección se ve siempre la misma torre.
+| Control | Teclado y ratón | Mando |
+|---|---|---|
+| Moverse | WASD o flechas | stick izquierdo |
+| Saltar / doble salto | Espacio (otra vez en el aire) | A |
+| Girar la cámara | ratón (clic para capturarlo, Esc lo suelta) o Q/E | stick derecho |
+| Panel de datos | F3 | — |
+
+Con `?semilla=1234` en la dirección se ve siempre la misma torre, y con `?altura=100` se empieza a esa altura.
 
 | Orden | Para qué |
 |---|---|

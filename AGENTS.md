@@ -17,7 +17,9 @@ Todo en **español**: código (variables, funciones, archivos), comentarios, com
 ```
 src/
   main.ts    arranque: une escena, bucle e interfaz (poca lógica aquí)
-  nucleo/    bucle de paso fijo, entrada (teclado/ratón/táctil)
+  config.ts  TODOS los números que se ajustan jugando (velocidades, saltos, cámara…)
+  nucleo/    bucle de paso fijo, entrada (teclado/ratón/mando → una misma estructura)
+  jugador/   control.ts (movimiento, LÓGICA PURA) y personaje.ts (dibujo y animación)
   reglas/    vida, fragmentos, tramos, carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
   mundo/     escena, luces, cámara, torre, escenarios (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
@@ -40,10 +42,13 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm run comprobar` | Comprobar los tipos de TypeScript |
 | `npm test` | Pasar las pruebas |
 | `npm run build` | Comprobar tipos y generar `dist/` para publicar |
-| `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms) y `--ruta` (por defecto `"?semilla=1&panel=1"`) |
+| `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms), `--ruta` (por defecto `"?semilla=1&panel=1"`) y `--teclas` (pulsar antes de capturar: `"Space:60,_:400,Space:60"` = doble salto; `_` espera) |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |
 
-Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (altura inicial de la cámara), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla y altura). Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png`.
+Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (empieza en el primer saliente desde esa altura), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla, altura y postura).
+
+- Las pulsaciones (saltar) solo valen en el paso en que se leen; los números van a `src/config.ts`, nunca sueltos por el código.
+- SwiftShader (la captura) va a 5-10 fps: el juego va «a cámara lenta» porque el bucle no recupera más de 5 pasos por fotograma. No sirve para medir rendimiento. Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png`.
 
 **Después de cada cambio visible, haz una captura y mírala** antes de decir que está hecho. Si la captura avisa de errores en la consola, arréglalos primero.
 

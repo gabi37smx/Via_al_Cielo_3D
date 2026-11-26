@@ -48,9 +48,55 @@ export interface Tramo {
   salientes: Saliente[];
 }
 
+/** Radio del anillo (rellano) que cierra cada tramo. */
+export const RADIO_RELLANO = RADIO_COLUMNA + FONDO_SALIENTE;
+/** Radio de la cueva: hasta dónde se puede llegar (m). */
+export const RADIO_MUNDO = 22;
+
+/*
+ * La caja real de cada saliente: un poco metida en la columna para que no se
+ * vea una rendija. La usan el dibujo (mundo/torre.ts) y el suelo (abajo), así
+ * lo que se ve y lo que se pisa son exactamente lo mismo.
+ */
+export const RADIO_CENTRO_CAJA = RADIO_SALIENTES - 0.1;
+export const FONDO_CAJA = FONDO_SALIENTE + 0.2;
+
 /** Posición del centro de un saliente en el plano (x, z). */
 export function posicionSaliente(s: Saliente): { x: number; z: number } {
   return { x: Math.cos(s.angulo) * RADIO_SALIENTES, z: Math.sin(s.angulo) * RADIO_SALIENTES };
+}
+
+/** ¿El punto (x, z) cae encima del saliente? `margen` amplía la caja (m). */
+export function sobreSaliente(s: Saliente, x: number, z: number, margen = 0): boolean {
+  const cos = Math.cos(s.angulo);
+  const sin = Math.sin(s.angulo);
+  const dx = x - cos * RADIO_CENTRO_CAJA;
+  const dz = z - sin * RADIO_CENTRO_CAJA;
+  const haciaFuera = dx * cos + dz * sin; // a lo largo del radio
+  const deLado = dx * sin - dz * cos; // a lo largo de la columna
+  return Math.abs(haciaFuera) <= FONDO_CAJA / 2 + margen && Math.abs(deLado) <= s.ancho / 2 + margen;
+}
+
+/**
+ * Altura del suelo más alto que hay debajo de (x, z) sin pasar de `techo`.
+ *
+ * Lo que está por ENCIMA de `techo` no cuenta: por eso los salientes se
+ * atraviesan desde abajo al saltar y solo frenan al caer sobre ellos
+ * (plataformas de un sentido, como en el Vía al Cielo 2D).
+ */
+export function alturaSuelo(tramo: Tramo, x: number, z: number, techo: number, margen = 0): number {
+  const r = Math.hypot(x, z);
+  let mejor = -Infinity;
+
+  // La base: en el tramo 0 es el suelo de la cueva (entero); en los demás,
+  // el rellano del tramo anterior (un anillo).
+  if (tramo.base <= techo && (tramo.indice === 0 || r <= RADIO_RELLANO + margen)) mejor = tramo.base;
+  if (tramo.rellano <= techo && r <= RADIO_RELLANO + margen) mejor = Math.max(mejor, tramo.rellano);
+
+  for (const s of tramo.salientes) {
+    if (s.y <= techo && s.y > mejor && sobreSaliente(s, x, z, margen)) mejor = s.y;
+  }
+  return mejor;
 }
 
 export function generarTramo(semilla: number, indice: number): Tramo {

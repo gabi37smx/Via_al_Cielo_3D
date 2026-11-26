@@ -9,10 +9,10 @@
  */
 import * as THREE from 'three';
 import { crearAzar, entre } from '../reglas/azar.ts';
-import { METROS_POR_TRAMO } from '../reglas/torre.ts';
+import { METROS_POR_TRAMO, RADIO_MUNDO } from '../reglas/torre.ts';
 import { materialRoca, type TexturaRoca } from './texturas.ts';
 
-export const RADIO_CUEVA = 22;
+export const RADIO_CUEVA = RADIO_MUNDO;
 export const COLOR_CUEVA = 0x101724;
 const CRISTALES = 140;
 

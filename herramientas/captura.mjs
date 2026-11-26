@@ -7,8 +7,13 @@
  *   node herramientas/captura.mjs [--salida capturas/x.png] [--ancho 1280] [--alto 720] [--espera 500]
  *                                 [--ruta "?semilla=1&altura=60&panel=1"]
  *
+ *                                 [--teclas "KeyW:600,Space:80"]
+ *
  * `--ruta` se añade a la dirección del juego: sirve para elegir la torre
  * (semilla), mirar a otra altura o abrir el panel de datos.
+ * `--teclas` pulsa teclas antes de la captura (código:milisegundos, en orden),
+ * para ver el juego en movimiento: un salto, una carrera… `_:300` espera
+ * 300 ms sin pulsar nada (p. ej. doble salto: "Space:60,_:300,Space:60").
  *
  * Arranca su propio servidor de Vite en un puerto libre (no hace falta tener
  * `npm run dev` abierto), espera a que el juego avise de que ya ha pintado
@@ -35,6 +40,7 @@ const { values: op } = parseArgs({
     alto: { type: 'string', default: '720' },
     espera: { type: 'string', default: '500' },
     ruta: { type: 'string', default: '?semilla=1&panel=1' },
+    teclas: { type: 'string', default: '' },
   },
 });
 
@@ -70,6 +76,16 @@ try {
 
   await pagina.goto(new URL(op.ruta, url).href);
   await pagina.waitForSelector('body[data-listo]', { timeout: 15000 });
+  for (const par of op.teclas.split(',').filter(Boolean)) {
+    const [tecla, ms = '100'] = par.trim().split(':');
+    if (tecla === '_') {
+      await pagina.waitForTimeout(Number(ms));
+      continue;
+    }
+    await pagina.keyboard.down(tecla);
+    await pagina.waitForTimeout(Number(ms));
+    await pagina.keyboard.up(tecla);
+  }
   await pagina.waitForTimeout(Number(op.espera));
 
   await mkdir(dirname(salida), { recursive: true });
