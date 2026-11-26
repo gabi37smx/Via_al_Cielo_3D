@@ -51,6 +51,14 @@ export interface Sala {
 export class ErrorSala extends Error {}
 
 const ESPERA_CONEXION = 12_000;
+/**
+ * Tras verse a sí mismo en la sala, cuánto se espera a que llegue quién
+ * estaba ya (ms). Supabase puede avisar de la propia entrada ANTES de mandar
+ * la lista de los que había: sin esta espera, el que entra se creía solo,
+ * se quedaba con su semilla y construía otra torre (fallo visto en
+ * `npm run prueba-red`, 1 de cada 2-3 veces).
+ */
+const ESPERA_LISTA = 1_000;
 
 function idAleatorio(): string {
   return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -89,16 +97,19 @@ export async function unirseASala(config: ConfigRed, codigo: string, nombre: str
     if (id && e && id !== yo.id && miembros.some((m) => m.id === id)) for (const cb of oyentesEstado) cb(id, e);
   });
 
-  // Esperar a estar dentro Y a ver nuestra propia presencia: entonces ya se
-  // sabe quién estaba antes (el anfitrión) y cuál es la semilla.
+  // Esperar a estar dentro, a ver nuestra propia presencia y un poco más
+  // (ESPERA_LISTA) para que llegue la lista de los que ya estaban: entonces
+  // se sabe quién es el anfitrión y cuál es la semilla.
   const listo = new Promise<void>((resolver, rechazar) => {
     const plazo = setTimeout(() => rechazar(new ErrorSala('No se pudo conectar con la sala (¿hay internet?)')), ESPERA_CONEXION);
+    let dentro = false;
     canal.on('presence', { event: 'sync' }, () => {
       miembros = leerPresencia(canal);
       for (const cb of oyentesMiembros) cb(miembros);
-      if (miembros.some((m) => m.id === yo.id)) {
+      if (!dentro && miembros.some((m) => m.id === yo.id)) {
+        dentro = true;
         clearTimeout(plazo);
-        resolver();
+        setTimeout(resolver, ESPERA_LISTA);
       }
     });
     canal.subscribe((estado) => {
