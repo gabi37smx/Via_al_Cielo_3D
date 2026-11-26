@@ -119,6 +119,19 @@ docs/          diseno.md, decisiones.md, creditos.md, sesiones/
 
 Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y qué falló.
 
+## Ideas de Gabi tras probar (26-nov) · por hacer
+
+Cada una en **su propia rama**: se prueba y, si no convence, no se fusiona y `main` sigue como estaba.
+
+| # | Idea | Cómo | Cuándo |
+|---|---|---|---|
+| I1 | **Pantalla completa** (todo es oscuro y molesta la luz del navegador) | Botón y tecla **F** con la API de pantalla completa; Esc sale | Ya: es pequeña |
+| I2 | **Escalar la pared de la cueva** en vez de una columna central: salientes en espiral por la pared circular, como el 2D | Se invierte la torre: los salientes salen de la pared hacia dentro; la cámara, desde el centro, mira a la pared. Se ven mejor los cristales y ya nada se pone entre la cámara y el escalador. Las reglas (2-3 m, rellano, semilla) se mantienen y las pruebas y la simulación lo vigilan | Antes de la sesión 6 (la carrera depende de la forma del mundo) |
+| I3 | **Agarrarse y trepar**: saltar, cogerse al borde con los brazos y subir al saliente | Estado nuevo en el movimiento (`colgado` → `trepando`): si salta y el borde queda a la altura de las manos, se agarra, se queda colgado y sube en ~0,5 s. Kenney no trae animación de trepar: se hace con poses del propio modelo (brazos arriba, agacharse) y movimiento por código | Sesión aparte, después de I2 |
+| I4 | **Cada escenario con su escalada**: cuevas → la pared; aire libre → la montaña del fondo; ciudades → el monumento (p. ej. la torre Eiffel en París) | La montaña sale de la misma idea que I2 (pared rocosa, ahora por fuera). Los monumentos son lo más caro: modelo propio por código (celosía de la Eiffel) o CC0 si lo hay | Sesión 7 en adelante; las ciudades, como mucho 1-2 |
+| I5 | **Elegir escaladora o escalador** antes de jugar o entrar en una sala (no se adivina por el nombre: hay nombres de los dos) | En el menú: «Escalador / Escaladora». La escaladora: un personaje femenino de Kenney Mini Characters (CC0) con **pelo largo** y colores alegres (rosa); si ninguno trae rosa, se le cambia el color de la ropa. La elección va en la presencia de la sala para que los rivales te vean igual que tú | Junto con la sesión 6 o antes (es corta) |
+| I6 | **Personalizar el escalador** para que se parezca a tu avatar (pelo, colores, accesorios) | Más adelante; en el filtro de alcance estaba fuera («personalizar más allá del color»): se revisa cuando la carrera esté terminada | Después de la 1.0 |
+
 ## Decisiones
 
 - **001** · Vite + TypeScript + Three.js + Rapier, como el caso «Chispa» del curso.
