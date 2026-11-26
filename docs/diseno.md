@@ -1,6 +1,6 @@
 # Vía al Cielo 3D · Diseño en una página
 
-> Borrador 1 · 24-nov-2026. Este documento manda: si el código y el diseño no coinciden, se corrige uno de los dos y se apunta en «Decisiones».
+> Borrador 2 · 26-nov-2026 (con las respuestas del profesor). Este documento manda: si el código y el diseño no coinciden, se corrige uno de los dos y se apunta en «Decisiones».
 
 ## La idea en una frase
 
@@ -29,7 +29,7 @@ Es la versión 3D de *Vía al Cielo* (2D, canvas, v73). De aquel juego se conser
 ### Modo solo
 Igual que el original: subir lo más alto posible. Vida a 0 → fin de partida → si entras en el top 10, iniciales y **ranking mundial** (API actual).
 
-### Modo carrera (multijugador)
+### Modo carrera (multijugador, obligatorio)
 - **Sala** de 2 a 4 jugadores con un código de 4 letras. Huecos vacíos → rivales del ordenador (opcional).
 - Todos escalan **la misma torre**: el anfitrión reparte una **semilla** y cada navegador genera los mismos salientes.
 - Cuenta atrás 3-2-1 y salida a la vez. **Meta: 220 m** (un tramo) en la versión 1; más tramos después.
@@ -69,8 +69,9 @@ Igual que el original: subir lo más alto posible. Vida a 0 → fin de partida �
 - **Vite + TypeScript + Three.js + Rapier.** Sin motor de juego.
 - **Bucle de paso fijo** de 1/60 s para la lógica y otro para pintar.
 - **Las reglas son lógica pura** (`src/reglas/`): sin Three.js, sin DOM y sin red. Así se prueban solas y se mide el equilibrio simulando partidas.
-- **Red de la carrera:** cada jugador simula su escalador y envía su posición ~10 veces por segundo; los demás se ven interpolados con ~100 ms de retardo. El anfitrión (el más antiguo de la sala) reparte la semilla, da la salida y decide el orden de llegada; si se va, lo hereda el siguiente. Sin servidor propio: **Supabase Realtime** (como el curso), pendiente de confirmar.
-- **Ranking:** modo solo → `api-via-al-cielo` (Render + MongoDB). Resultados de carrera → solo en la sala en la v1.
+- **Red de la carrera:** cada jugador simula su escalador y envía su posición ~10 veces por segundo; los demás se ven interpolados con ~100 ms de retardo. El anfitrión (el más antiguo de la sala) reparte la semilla, da la salida y decide el orden de llegada; si se va, lo hereda el siguiente. Sin servidor de juego propio: **Supabase Realtime**, como en el curso (confirmado por el profesor).
+- **Ranking:** modo solo → `api-via-al-cielo` (Render + MongoDB). Resultados de carrera → solo en la sala en la v1. La API solo acepta las webs de su lista: hay que añadir la dirección del juego a `ORIGENES_PERMITIDOS` en Render.
+- **Publicación:** en el **servidor del centro** (el mismo de la IA del centro). Vite genera una carpeta `dist/` con archivos estáticos que se sube allí. Pendiente: cómo se sube y qué dirección tendrá.
 - **Herramientas para que la IA vea:** captura del juego en Chromium sin pantalla (`herramientas/captura.mjs`) y panel **F3** con FPS, llamadas de dibujo, triángulos y estado de la red.
 - **Presupuesto:** 16 ms por fotograma, < 200 llamadas de dibujo, ~300 000 triángulos, texturas de 1024 px. Los salientes, con *instancing*.
 - **Créditos:** todo modelo, textura o sonido de fuera se apunta en `docs/creditos.md` con su origen y licencia.
@@ -98,7 +99,7 @@ docs/          diseno.md, decisiones.md, creditos.md, sesiones/
 | 5 | Red: salas, semilla compartida, ver a los rivales (**prueba con dos navegadores el primer día**) | `sesion-05` |
 | 6 | Carrera completa: cuenta atrás, meta, reaparición, resultados, rivales del ordenador | `sesion-06` |
 | 7 | Sonido, partículas, más escenarios, ranking, móvil, ayuda y ajustes | `sesion-07` |
-| 8 | Release 1.0, publicación y defensa | `v1.0.0` |
+| 8 | Release 1.0, publicación en el servidor del centro y defensa | `v1.0.0` |
 
 Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y qué falló.
 
@@ -108,11 +109,13 @@ Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y 
 - **002** · Torre en espiral con cámara en tercera persona (no pared plana en 2,5D): aprovecha el 3D sin perder la escalada.
 - **003** · En carrera los jugadores se atraviesan y se reaparece en lugar de morir.
 - **004** · Se reutiliza la API del ranking para el modo solo; los metros siguen la misma escala (220 m por tramo).
+- **005** · El multijugador en red es obligatorio: modo carrera de 2 a 4 jugadores (respuesta del profesor, 26-nov).
+- **006** · Se puede partir del Vía al Cielo 2D: sus reglas y la API del ranking (profesor, 26-nov).
+- **007** · La red va con **Supabase** (profesor, 26-nov).
+- **008** · Se publica en el **servidor del centro** (profesor, 26-nov).
+- **009** · Vale OpenCode o Claude Code; se usa **Claude Code** y el `AGENTS.md` sirve para los dos.
 
-## Pendiente de preguntar al profesor
+## Pendiente
 
-1. ¿El multijugador en red es obligatorio? ¿Vale una carrera de 2-4?
-2. ¿Se puede partir de un proyecto anterior (reglas y API del ranking)?
-3. ¿Hay que usar Supabase del curso o vale otro servicio? ¿Dónde se publica?
-4. ¿La IA tiene que ser OpenCode o vale Claude Code?
-5. ¿Dónde está la rúbrica de la sesión 8 «Release y defensa»?
+- **Rúbrica de la sesión 8** (release y defensa): aún no está publicada. La semana que viene el profesor publicará una guía y la rúbrica irá saliendo poco a poco, como en los otros proyectos.
+- **Servidor del centro:** cómo se suben los archivos y qué dirección tendrá el juego.
