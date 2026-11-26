@@ -111,3 +111,34 @@ export function decodificar(d: unknown): EstadoRed | null {
   if (!postura) return null;
   return { t: t!, x: x!, y: y!, z: z!, orientacion: orientacion!, postura, rapidez: rapidez!, voltereta: voltereta! };
 }
+
+/* ---------- Mensajes de la carrera (sesión 6) ---------- */
+
+/**
+ * - `salida`: el anfitrión empieza la carrera número `ronda`, con `bots`
+ *   rivales del ordenador. Cada uno arranca su cuenta atrás al recibirlo.
+ * - `meta`: un jugador ha llegado con este tiempo de carrera (s).
+ * - `fin`: el anfitrión da la carrera por acabada (han llegado todos o ha
+ *   pasado el tiempo de espera).
+ */
+export type MensajeCarrera =
+  | { tipo: 'salida'; ronda: number; bots: number }
+  | { tipo: 'meta'; ronda: number; tiempo: number }
+  | { tipo: 'fin'; ronda: number };
+
+/** Valida un mensaje de carrera que llega de la red; null si no tiene buena pinta. */
+export function leerMensajeCarrera(m: unknown): MensajeCarrera | null {
+  if (typeof m !== 'object' || m === null) return null;
+  const { tipo, ronda, bots, tiempo } = m as Record<string, unknown>;
+  if (!Number.isInteger(ronda) || (ronda as number) < 1) return null;
+  const r = ronda as number;
+  if (tipo === 'salida' && Number.isInteger(bots) && (bots as number) >= 0 && (bots as number) <= MAX_JUGADORES - 1) {
+    return { tipo, ronda: r, bots: bots as number };
+  }
+  // Un tiempo de menos de 220 m / 14 m/s sería imposible (o una trampa): se tira.
+  if (tipo === 'meta' && typeof tiempo === 'number' && Number.isFinite(tiempo) && tiempo >= 220 / 14 && tiempo < 3600) {
+    return { tipo, ronda: r, tiempo };
+  }
+  if (tipo === 'fin') return { tipo, ronda: r };
+  return null;
+}

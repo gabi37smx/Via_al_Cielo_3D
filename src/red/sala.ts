@@ -21,7 +21,9 @@ import {
   ordenarMiembros,
   type EstadoRed,
   leerAspecto,
+  leerMensajeCarrera,
   type Aspecto,
+  type MensajeCarrera,
   type Miembro,
 } from './protocolo.ts';
 
@@ -46,6 +48,9 @@ export interface Sala {
   anfitrion(): Miembro | undefined;
   enviarEstado(e: EstadoRed): void;
   alRecibirEstado(cb: (id: string, e: EstadoRed) => void): void;
+  /** Mensajes de la carrera (salida, meta, fin). No te llegan los tuyos. */
+  enviarCarrera(m: MensajeCarrera): void;
+  alRecibirCarrera(cb: (id: string, m: MensajeCarrera) => void): void;
   alCambiarMiembros(cb: (miembros: Miembro[]) => void): void;
   salir(): Promise<void>;
 }
@@ -99,11 +104,17 @@ export async function unirseASala(
   let miembros: Miembro[] = [];
   const oyentesMiembros: ((m: Miembro[]) => void)[] = [];
   const oyentesEstado: ((id: string, e: EstadoRed) => void)[] = [];
+  const oyentesCarrera: ((id: string, m: MensajeCarrera) => void)[] = [];
 
   canal.on('broadcast', { event: 'estado' }, ({ payload }) => {
     const id = typeof payload?.id === 'string' ? payload.id : null;
     const e = decodificar(payload?.d);
     if (id && e && id !== yo.id && miembros.some((m) => m.id === id)) for (const cb of oyentesEstado) cb(id, e);
+  });
+  canal.on('broadcast', { event: 'carrera' }, ({ payload }) => {
+    const id = typeof payload?.id === 'string' ? payload.id : null;
+    const m = leerMensajeCarrera(payload?.m);
+    if (id && m && id !== yo.id && miembros.some((x) => x.id === id)) for (const cb of oyentesCarrera) cb(id, m);
   });
 
   // Esperar a estar dentro, a ver nuestra propia presencia y un poco más
@@ -161,6 +172,10 @@ export async function unirseASala(
       void canal.send({ type: 'broadcast', event: 'estado', payload: { id: yo.id, d: codificar(e) } });
     },
     alRecibirEstado: (cb) => void oyentesEstado.push(cb),
+    enviarCarrera(m) {
+      void canal.send({ type: 'broadcast', event: 'carrera', payload: { id: yo.id, m } });
+    },
+    alRecibirCarrera: (cb) => void oyentesCarrera.push(cb),
     alCambiarMiembros: (cb) => void oyentesMiembros.push(cb),
     async salir() {
       await canal.untrack();

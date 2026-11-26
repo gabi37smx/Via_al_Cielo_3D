@@ -8,6 +8,7 @@ import {
   elegirAnfitrion,
   generarCodigo,
   leerAspecto,
+  leerMensajeCarrera,
   limpiarNombre,
   normalizarCodigo,
   type EstadoRed,
@@ -141,5 +142,27 @@ describe('aspecto (escalador o escaladora)', () => {
 
   it('lo que no vale (versión antigua sin aspecto, URL mal escrita, datos raros) es escalador', () => {
     for (const raro of [undefined, null, '', 'ESCALADORA', 'robot', 3, {}]) expect(leerAspecto(raro)).toBe('escalador');
+  });
+});
+
+describe('mensajes de la carrera', () => {
+  it('acepta salida, meta y fin bien formados', () => {
+    expect(leerMensajeCarrera({ tipo: 'salida', ronda: 1, bots: 2 })).toEqual({ tipo: 'salida', ronda: 1, bots: 2 });
+    expect(leerMensajeCarrera({ tipo: 'meta', ronda: 3, tiempo: 95.5 })).toEqual({ tipo: 'meta', ronda: 3, tiempo: 95.5 });
+    expect(leerMensajeCarrera({ tipo: 'fin', ronda: 2 })).toEqual({ tipo: 'fin', ronda: 2 });
+  });
+
+  it('tira lo raro: tipos desconocidos, rondas o bots imposibles y tiempos de llegada imposibles', () => {
+    for (const raro of [
+      null, 'salida', 42, {},
+      { tipo: 'salida', ronda: 0, bots: 1 },
+      { tipo: 'salida', ronda: 1.5, bots: 1 },
+      { tipo: 'salida', ronda: 1, bots: 4 },
+      { tipo: 'meta', ronda: 1, tiempo: 3 }, // 220 m en 3 s: más de 14 m/s
+      { tipo: 'meta', ronda: 1, tiempo: Number.NaN },
+      { tipo: 'trampa', ronda: 1 },
+    ]) {
+      expect(leerMensajeCarrera(raro)).toBeNull();
+    }
   });
 });

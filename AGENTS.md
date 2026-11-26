@@ -26,6 +26,7 @@ src/
   mundo/     escena, luces, cámara, torre, escenarios (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
   red/       protocolo.ts e interpolacion.ts (LÓGICA PURA) y sala.ts (Supabase)
+  modos/     cada modo de juego une reglas, red y pantalla (carrera.ts: la carrera en una sala)
   ui/        menús, HUD, ranking, contador de fps
 public/modelos/ escalador.glb y escaladora.glb (Kenney, CC0) y su textura
 herramientas/  captura.mjs, simular.ts
@@ -47,12 +48,13 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm run build` | Comprobar tipos y generar `dist/` para publicar |
 | `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms), `--ruta` (por defecto `"?semilla=1&panel=1"`) y `--teclas` (pulsar antes de capturar: `"Space:60,_:400,Space:60"` = doble salto; `_` espera) |
 | `npm run simular` | Simula subidas de la cueva con el escalador del ordenador y enseña una tabla (`npm run simular -- 50 20`: 50 torres, 20 murciélagos). **Después de tocar números de `config.ts` o `REGLAS`, simula** |
-| `npm run prueba-red` | **Prueba con dos navegadores** contra Supabase (Ana con la escaladora y Beto con el escalador): se ven, misma semilla, anfitrión, cada uno ve al otro con su aspecto, posición del rival y relevo del anfitrión. Deja `capturas/red-ana.png` y `capturas/red-beto.png`. Necesita el `.env` |
+| `npm run prueba-red` | **Prueba con dos navegadores** contra Supabase (Ana con la escaladora y Beto con el escalador): se ven, misma semilla, anfitrión, cada uno ve al otro con su aspecto, posición del rival, **una carrera entera** (salida, llegadas, fin y ganador) y relevo del anfitrión. Tarda ~2 minutos. Deja `capturas/red-ana.png`, `capturas/red-beto.png` y `capturas/red-carrera.png`. Necesita el `.env` |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |
 
 Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (empieza en el primer saliente desde esa altura), `?aspecto=escaladora` (o `escalador`; sin él, el último elegido en el menú), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla, altura y postura).
 
-- En la consola del navegador (y en la captura con `--js "…"`) está `juego`: `juego.partida`, `juego.escalador`, `juego.danar(50)`.
+- En la consola del navegador (y en la captura con `--js "…"`) está `juego`: `juego.partida`, `juego.escalador`, `juego.danar(50)`, `juego.teletransportar(x, y, z)`, `juego.red`, `juego.carrera` y `juego.empezarCarrera()` (el anfitrión).
+- Con `?sala=` la captura se da por lista en cuanto sale «Conectando…»: para pulsar algo en la sala de espera, espera antes (`--teclas "_:5000,Enter:60"`).
 - Las pulsaciones (saltar) solo valen en el paso en que se leen; los números van a `src/config.ts`, nunca sueltos por el código.
 - SwiftShader (la captura) va a 5-10 fps: el juego va «a cámara lenta» porque el bucle no recupera más de 5 pasos por fotograma. No sirve para medir rendimiento. Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png`.
 

@@ -1,6 +1,6 @@
 import './estilo.css';
 import { CONFIG } from './config.ts';
-import { crearEscalador, pasoEscalador, progresoPostura, type Escalador, type Ordenes } from './jugador/control.ts';
+import { progresoPostura, type Ordenes } from './jugador/control.ts';
 import { cargarModelos, crearPersonaje } from './jugador/personaje.ts';
 import { ENVIOS_POR_SEGUNDO, generarCodigo, leerAspecto, limpiarNombre, normalizarCodigo } from './red/protocolo.ts';
 import { ErrorSala, configuracionRed, unirseASala, type Sala } from './red/sala.ts';
@@ -10,15 +10,10 @@ import { aspectoGuardado, mostrarMenu, type Eleccion } from './ui/menu.ts';
 import { crearPantallaCompleta } from './ui/pantallaCompleta.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
-import {
-  REGLAS,
-  crearPartida,
-  generarFragmentos,
-  generarMurcielagos,
-  pasoPartida,
-  type Jugada,
-  type Partida,
-} from './reglas/partida.ts';
+import { REGLAS, generarFragmentos, generarMurcielagos, type Jugada } from './reglas/partida.ts';
+import { crearCorredor, pasoCorredor, type Corredor } from './reglas/carrera.ts';
+import { crearCarreraEnSala } from './modos/carrera.ts';
+import { crearPantallaCarrera } from './ui/carrera.ts';
 import { alturaSuelo, generarTramo, posicionSaliente, puntoDeSalida } from './reglas/torre.ts';
 import { crearCamaraTerceraPersona, giroHaciaPared } from './mundo/camara.ts';
 import { crearCueva } from './mundo/cueva.ts';
@@ -106,7 +101,6 @@ mundo.escena.add(crearCueva(mundo.escena, roca, tramo), crearTorre(tramo, piedra
 // Dónde empieza: en el suelo antes del primer saliente, o en el saliente pedido con ?altura.
 const inicio = tramo.salientes.find((s) => s.y >= alturaInicial) ?? tramo.salientes[0]!;
 const enSuelo = puntoDeSalida(tramo, puesto);
-const anguloInicio = alturaInicial > 0 ? inicio.angulo : enSuelo.angulo;
 const salida = alturaInicial > 0 ? { ...posicionSaliente(inicio), y: inicio.y } : { x: enSuelo.x, z: enSuelo.z, y: 0 };
 
 // El modelo del escalador se descarga (~270 kB): el juego arranca cuando llega.
@@ -133,19 +127,41 @@ if (sala) {
 const PASOS_POR_ENVIO = Math.round(60 / ENVIOS_POR_SEGUNDO);
 let pasosDesdeEnvio = 0;
 
-let escalador: Escalador;
-let partida: Partida;
+/*
+ * El jugador es un «corredor» (reglas/carrera.ts): su escalador, su partida
+ * y, en la carrera, su reaparición y su llegada. Al reaparecer se le cambia
+ * el escalador, así que siempre se lee como `jugador.escalador`.
+ */
+let jugador: Corredor;
 const anterior = { x: 0, y: 0, z: 0 };
 
-function reiniciar() {
-  escalador = crearEscalador(salida.x, salida.y, salida.z);
-  escalador.orientacion = Math.atan2(Math.cos(anguloInicio), Math.sin(anguloInicio)); // mirando a la pared
-  Object.assign(anterior, salida);
-  partida = crearPartida();
-  partida.alturaMaxima = salida.y;
+/** Al principio, al «volver a jugar» (solo) y en cada salida de carrera (con su puesto). */
+function reiniciar(puestoCarrera?: number) {
+  jugador = crearCorredor(tramo, puestoCarrera ?? puesto);
+  const e = jugador.escalador;
+  if (puestoCarrera === undefined) Object.assign(e, salida);
+  const angulo = Math.atan2(e.z, e.x);
+  e.orientacion = Math.atan2(Math.cos(angulo), Math.sin(angulo)); // mirando a la pared
+  Object.assign(anterior, { x: e.x, y: e.y, z: e.z });
+  jugador.partida.alturaMaxima = e.y;
   fragmentos.mostrarTodos();
 }
 reiniciar();
+
+// 3 · La carrera (solo en una sala): sala de espera, cuenta atrás, meta y resultados.
+const carrera = sala
+  ? crearCarreraEnSala({
+      sala,
+      semilla,
+      tramo,
+      peligros,
+      rivales,
+      pantalla: crearPantallaCarrera(document.querySelector<HTMLElement>('#carrera')!, {
+        alEmpezar: (conOrdenador) => carrera?.alEmpezar(conOrdenador),
+      }),
+      alReiniciar: (p) => reiniciar(p),
+    })
+  : null;
 
 /** Lo que se ve y se oye reacciona a las jugadas de las reglas. */
 function atender(j: Jugada) {
@@ -166,14 +182,12 @@ function atender(j: Jugada) {
       hud.destello();
       break;
     case 'fin': {
-      const recordNuevo = guardarRecord(partida.alturaMaxima);
-      fin.mostrar({
-        altura: partida.alturaMaxima,
-        fragmentos: partida.recogidos.length,
-        segundos: partida.tiempo,
-        record: leerRecord(),
-        recordNuevo,
-      });
+      // En la carrera no se acaba: se reaparece (lo lleva pasoCorredor).
+      if (carrera) break;
+      jugador.reaparecerEn = 0;
+      const p = jugador.partida;
+      const recordNuevo = guardarRecord(p.alturaMaxima);
+      fin.mostrar({ altura: p.alturaMaxima, fragmentos: p.recogidos.length, segundos: p.tiempo, record: leerRecord(), recordNuevo });
       break;
     }
   }
@@ -191,46 +205,55 @@ const bucle = crearBucle({
       -m.ratonX * CC.sensibilidadRaton - m.girarX * CC.velocidadGiro * paso,
       m.ratonY * CC.sensibilidadRaton + m.girarY * CC.velocidadGiro * paso,
     );
-    camara.recolocar(escalador.x, escalador.z, paso);
+    const e0 = jugador.escalador;
+    camara.recolocar(e0.x, e0.z, paso);
+    anterior.x = e0.x;
+    anterior.y = e0.y;
+    anterior.z = e0.z;
 
-    anterior.x = escalador.x;
-    anterior.y = escalador.y;
-    anterior.z = escalador.z;
-    // Con la partida acabada ya no obedece, pero sigue cayendo si estaba en el aire.
-    const ordenes = partida.terminada
+    carrera?.antesDelPaso(paso);
+    // Quieto en la espera y la cuenta atrás de la carrera, y con la partida
+    // acabada en solo (pero sigue cayendo si estaba en el aire).
+    const quieto = carrera ? !carrera.sePuedeMover() : jugador.partida.terminada;
+    const ordenes = quieto
       ? { ...QUIETO, giroCamara: camara.giro }
       : { moverX: m.moverX, moverY: m.moverY, saltar: m.saltar, giroCamara: camara.giro };
-    const sucesos = pasoEscalador(escalador, ordenes, suelo, paso);
-    if (sucesos.aterrizaje > 0.5) personaje.aterrizar(sucesos.aterrizaje / 6);
-
-    const situacion = { x: escalador.x, y: escalador.y, z: escalador.z, aterrizaje: sucesos.aterrizaje };
-    for (const j of pasoPartida(partida, situacion, peligros, paso)) atender(j);
+    const tiempo = carrera ? carrera.estado.tiempo : jugador.partida.tiempo;
+    const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso);
+    if (r.sucesos.aterrizaje > 0.5) personaje.aterrizar(r.sucesos.aterrizaje / 6);
+    if (r.reaparecio) Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
+    for (const j of r.jugadas) atender(j);
+    carrera?.despuesDelPaso(paso, jugador, r);
 
     // 10 veces por segundo, contar a la sala dónde estoy.
+    const e = jugador.escalador;
     if (sala && ++pasosDesdeEnvio >= PASOS_POR_ENVIO) {
       pasosDesdeEnvio = 0;
       sala.enviarEstado({
         t: performance.now(),
-        x: escalador.x,
-        y: escalador.y,
-        z: escalador.z,
-        orientacion: escalador.orientacion,
-        postura: escalador.postura,
-        rapidez: Math.hypot(escalador.vx, escalador.vz),
-        voltereta: progresoPostura(escalador),
+        x: e.x,
+        y: e.y,
+        z: e.z,
+        orientacion: e.orientacion,
+        postura: e.postura,
+        rapidez: Math.hypot(e.vx, e.vz),
+        voltereta: progresoPostura(e),
       });
     }
   },
   pintar(alfa, dtReal) {
+    const e = jugador.escalador;
+    const partida = jugador.partida;
     // Posición mezclada entre el paso anterior y el actual (movimiento suave).
-    pintado.x = anterior.x + (escalador.x - anterior.x) * alfa;
-    pintado.y = anterior.y + (escalador.y - anterior.y) * alfa;
-    pintado.z = anterior.z + (escalador.z - anterior.z) * alfa;
+    pintado.x = anterior.x + (e.x - anterior.x) * alfa;
+    pintado.y = anterior.y + (e.y - anterior.y) * alfa;
+    pintado.z = anterior.z + (e.z - anterior.z) * alfa;
 
-    personaje.colocar(pintado.x, pintado.y, pintado.z, escalador.orientacion);
-    personaje.animar(escalador.postura, Math.hypot(escalador.vx, escalador.vz), progresoPostura(escalador), dtReal);
-    // Parpadea mientras es invulnerable.
-    personaje.raiz.visible = partida.invulnerable === 0 || Math.floor(partida.invulnerable * 12) % 2 === 0;
+    personaje.colocar(pintado.x, pintado.y, pintado.z, e.orientacion);
+    personaje.animar(e.postura, Math.hypot(e.vx, e.vz), progresoPostura(e), dtReal);
+    // Parpadea mientras es invulnerable; esperando a reaparecer, no se ve.
+    personaje.raiz.visible =
+      jugador.reaparecerEn === 0 && (partida.invulnerable === 0 || Math.floor(partida.invulnerable * 12) % 2 === 0);
     sombra.colocar(pintado.x, suelo(pintado.x, pintado.z, pintado.y + 0.05), pintado.z, pintado.y);
     camara.seguir(pintado.x, pintado.y, pintado.z, dtReal);
 
@@ -238,20 +261,21 @@ const bucle = crearBucle({
     fragmentos.animar(t);
     murcielagos.actualizar(t);
     rivales.pintar(performance.now(), dtReal);
-    if (sala && lista) {
-      const alturas = rivales.alturas().set(sala.yo.id, escalador.y);
-      lista.actualizar(sala.miembros(), sala.yo.id, sala.anfitrion()?.id, alturas);
+    if (sala && lista && carrera) {
+      carrera.pintar(alfa, dtReal, jugador, e.y);
+      const alturas = new Map([...rivales.alturas(), ...carrera.alturasDelOrdenador(), [sala.yo.id, e.y]]);
+      lista.actualizar([...sala.miembros(), ...carrera.delOrdenadorEnLista()], sala.yo.id, sala.anfitrion()?.id, alturas);
     }
 
     mundo.pintar(pintado);
     fps.contar(dtReal);
-    panel.actualizar(dtReal, { semilla, altura: escalador.y, postura: escalador.postura });
+    panel.actualizar(dtReal, { semilla, altura: e.y, postura: e.postura });
     hud.actualizar({
       vida: partida.vida,
-      altura: escalador.y,
+      altura: e.y,
       record: Math.max(leerRecord(), partida.alturaMaxima),
       fragmentos: partida.recogidos.length,
-      tramo: 'Tramo 1 · La cueva',
+      tramo: carrera ? 'Carrera · meta a 220 m' : 'Tramo 1 · La cueva',
     });
 
     // Aviso para herramientas/captura.mjs: la escena ya se ha pintado varias veces.
@@ -266,13 +290,26 @@ bucle.arrancar();
 Object.assign(window, {
   juego: {
     get partida() {
-      return partida;
+      return jugador.partida;
     },
     get escalador() {
-      return escalador;
+      return jugador.escalador;
     },
     danar(n: number) {
-      partida.vida = Math.max(partida.vida - n, 1);
+      jugador.partida.vida = Math.max(jugador.partida.vida - n, 1);
+    },
+    /** Pone al escalador en (x, y, z) cayendo: para probar la meta sin subir 220 m. */
+    teletransportar(x: number, y: number, z: number) {
+      Object.assign(jugador.escalador, { x, y, z, vx: 0, vy: 0, vz: 0, enSuelo: false });
+      Object.assign(anterior, { x, y, z });
+    },
+    /** El anfitrión empieza la carrera (lo mismo que el botón). */
+    empezarCarrera(conOrdenador = true) {
+      carrera?.alEmpezar(conOrdenador);
+    },
+    /** Estado de la carrera: fase, ronda, tiempo, participantes y llegadas. */
+    get carrera() {
+      return carrera?.resumen() ?? null;
     },
     /** Estado de la red: sala, quién está, quién es el anfitrión y dónde se ve a cada rival. */
     get red() {

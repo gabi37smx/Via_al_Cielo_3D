@@ -1,9 +1,13 @@
 /*
- * Los otros escaladores de la sala: un personaje por rival, con su nombre
- * encima, colocado donde dice su interpolador. Solo dibuja.
+ * Los otros escaladores: un personaje por rival, con su nombre encima. Solo
+ * dibuja.
+ * - Los de la sala (personas): donde dice su interpolador (llegan por la red).
+ * - Los del ordenador (sesión 6): donde los pone su simulación, que corre en
+ *   este mismo navegador (bots/rivalesOrdenador.ts).
  */
 import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import type { Postura } from '../jugador/control.ts';
 import { crearPersonaje, type Personaje } from '../jugador/personaje.ts';
 import { Interpolador } from '../red/interpolacion.ts';
 import type { Aspecto, EstadoRed, Miembro } from '../red/protocolo.ts';
@@ -41,8 +45,23 @@ interface Rival {
   ultimo: EstadoRed | null;
 }
 
+/** Lo que hace falta para pintar a un rival del ordenador en este fotograma. */
+export interface PoseRival {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  orientacion: number;
+  postura: Postura;
+  rapidez: number;
+  progreso: number;
+  /** Parpadea (invulnerable) o está esperando a reaparecer. */
+  visible: boolean;
+}
+
 export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>) {
   const rivales = new Map<string, Rival>();
+  const delOrdenador = new Map<string, Personaje>();
 
   return {
     /** Ajusta los rivales a la lista de la sala (entra alguien, se va alguien). */
@@ -63,6 +82,30 @@ export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>
         escena.add(personaje.raiz);
         rivales.set(m.id, { miembro: m, personaje, interpolador: new Interpolador(), ultimo: null });
       });
+    },
+    /**
+     * Pone los rivales del ordenador de esta carrera (quita los de la
+     * anterior). `primerColor`: van detrás de las personas en la lista.
+     */
+    ponerDelOrdenador(lista: { id: string; nombre: string; aspecto: Aspecto }[], primerColor: number) {
+      for (const p of delOrdenador.values()) escena.remove(p.raiz);
+      delOrdenador.clear();
+      lista.forEach((r, i) => {
+        const personaje = crearPersonaje(modelos[r.aspecto]);
+        const color = COLORES_JUGADOR[(primerColor + i) % COLORES_JUGADOR.length]!;
+        personaje.raiz.add(etiqueta(`${r.nombre} (CPU)`, color));
+        escena.add(personaje.raiz);
+        delOrdenador.set(r.id, personaje);
+      });
+    },
+    pintarDelOrdenador(poses: PoseRival[], dt: number) {
+      for (const p of poses) {
+        const personaje = delOrdenador.get(p.id);
+        if (!personaje) continue;
+        personaje.raiz.visible = p.visible;
+        personaje.colocar(p.x, p.y, p.z, p.orientacion);
+        personaje.animar(p.postura, p.rapidez, p.progreso, dt);
+      }
     },
     recibir(id: string, e: EstadoRed, ahora: number) {
       rivales.get(id)?.interpolador.anadir(e, ahora);
@@ -96,3 +139,5 @@ export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>
     },
   };
 }
+
+export type RivalesEnEscena = ReturnType<typeof crearRivales>;

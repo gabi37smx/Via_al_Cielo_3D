@@ -9,6 +9,8 @@
  * cuando está a tiro y usar el doble salto si se queda corto.
  */
 import type { Escalador, Ordenes } from '../jugador/control.ts';
+import { PASO } from '../nucleo/bucle.ts';
+import type { Azar } from '../reglas/azar.ts';
 import { RADIO_CAMINO, RADIO_PARED, puntoEnAngulo, type Tramo } from '../reglas/torre.ts';
 
 /** Distancia horizontal (m) a la que salta hacia el siguiente saliente. */
@@ -42,14 +44,38 @@ export function siguienteObjetivo(e: Escalador, tramo: Tramo, apoyo: number): Ob
 }
 
 export interface Cerebro {
-  pensar(e: Escalador): Ordenes;
+  /** Las órdenes de este paso (`paso` = lo que dura el paso, para las pausas). */
+  pensar(e: Escalador, paso?: number): Ordenes;
 }
 
-export function crearCerebro(tramo: Tramo): Cerebro {
+export interface OpcionesCerebro {
+  /**
+   * Pausa al azar (0 a `pausaMax` s) cada vez que aterriza en un saliente
+   * nuevo, antes de seguir. Da a cada rival del ordenador su ritmo: sin
+   * pausas todos subirían igual y llegarían casi juntos.
+   */
+  pausaMax?: number;
+  /** El azar de las pausas (con semilla: todos los navegadores ven lo mismo). */
+  azar?: Azar;
+}
+
+const QUIETO: Ordenes = { moverX: 0, moverY: 0, saltar: false, giroCamara: 0 };
+
+export function crearCerebro(tramo: Tramo, opciones: OpcionesCerebro = {}): Cerebro {
+  const { pausaMax = 0, azar } = opciones;
   let apoyo = -Infinity;
+  let espera = 0;
   return {
-    pensar(e) {
-      if (e.enSuelo) apoyo = e.y;
+    pensar(e, paso = PASO) {
+      if (e.enSuelo) {
+        // Acaba de aterrizar en otro sitio: pausa antes de seguir.
+        if (Math.abs(e.y - apoyo) > 0.3 && azar && pausaMax > 0) espera = azar() * pausaMax;
+        apoyo = e.y;
+      }
+      if (espera > 0) {
+        espera -= paso;
+        return QUIETO;
+      }
       return decidir(e, siguienteObjetivo(e, tramo, apoyo));
     },
   };
