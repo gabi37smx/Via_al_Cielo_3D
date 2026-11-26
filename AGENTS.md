@@ -40,8 +40,10 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm run comprobar` | Comprobar los tipos de TypeScript |
 | `npm test` | Pasar las pruebas |
 | `npm run build` | Comprobar tipos y generar `dist/` para publicar |
-| `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms) |
+| `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms) y `--ruta` (por defecto `"?semilla=1&panel=1"`) |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |
+
+Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (altura inicial de la cámara), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla y altura). Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png`.
 
 **Después de cada cambio visible, haz una captura y mírala** antes de decir que está hecho. Si la captura avisa de errores en la consola, arréglalos primero.
 

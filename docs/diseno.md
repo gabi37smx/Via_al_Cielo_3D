@@ -45,7 +45,9 @@ Igual que el original: subir lo más alto posible. Vida a 0 → fin de partida �
 | Unidad | 20 px = 1 m | 1 unidad Three.js = 1 m |
 | Tramo / pantalla | 220 m | 220 m (la API lo valida: `METROS_POR_PANTALLA`) |
 | Altura del salto | ~8 m | ~3,5 m + ~2 m el doble salto |
-| Separación entre salientes | — | 2-3 m en vertical |
+| Separación entre salientes | — | 2-3 m en vertical, 30-50° de giro (2-3,4 m entre centros) |
+| Columna / salientes | — | columna de 3 m de radio; salientes de 1,6-2,2 × 2,2 m; ~90 por tramo |
+| Final de cada tramo | — | rellano: anillo completo alrededor de la columna |
 | Caída que hace daño | > 90 m → −30 % | igual |
 | Daño de animales | 10-20 % | igual (murciélago 10, águila 15…) |
 | Invulnerable tras golpe | 90 fotogramas | 1,5 s |
@@ -116,6 +118,10 @@ Cada sesión deja en `docs/sesiones/` qué se hizo, qué se le pidió a la IA y 
 - **009** · Vale OpenCode o Claude Code; se usa **Claude Code** y el `AGENTS.md` sirve para los dos.
 - **010** · Pruebas con **Vitest** y captura con **Playwright** (Chromium sin pantalla, SwiftShader si no hay tarjeta gráfica). La captura arranca su propio Vite para no depender de tener `npm run dev` abierto.
 - **011** · `base: './'` en `vite.config.ts`: el juego vivirá en una subcarpeta del servidor del centro.
+- **012** · La torre se **genera con código a partir de la semilla**, no con un guion de Blender como el escenario del curso: en la carrera todos los navegadores tienen que construir la misma torre recibiendo solo un número. Cada tramo tiene su propia semilla derivada (`derivarSemilla`), así se puede generar el tramo 3 sin los anteriores.
+- **013** · Cada tramo **acaba en un rellano** (anillo completo): une un tramo con el siguiente desde cualquier lado y garantiza que también el último hueco mide 2-3 m. Las pruebas lo comprueban con 60 semillas.
+- **014** · **Texturas pintadas en canvas** (color, normales y rugosidad del mismo ruido periódico): nada que descargar ni acreditar. Los salientes usan una piedra **más clara** que la columna para que se vea de un vistazo dónde se puede pisar.
+- **015** · El sol proyecta sombras solo en una caja de 28 m que **sigue a la cámara**: una sombra que cubriera los 220 m saldría borrosa.
 
 ## Pendiente
 
