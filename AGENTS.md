@@ -23,7 +23,7 @@ src/
   jugador/   control.ts (movimiento, LÓGICA PURA) y personaje.ts (dibujo y animación)
   reglas/    torre, partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
   bots/      cerebro del escalador del ordenador y simulación de partidas (lógica pura)
-  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts y grieta.ts (Three.js)
+  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts, grieta.ts y adornos.ts (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
   red/       protocolo.ts e interpolacion.ts (LÓGICA PURA) y sala.ts (Supabase)
   sonido/    sucesos.ts (qué suena en cada paso, LÓGICA PURA), sintetizador.ts (cómo suena, Web Audio) y audio.ts (volumen, M, fondo)
