@@ -32,6 +32,7 @@ import {
 } from '../reglas/carrera.ts';
 import type { Peligros } from '../reglas/partida.ts';
 import type { Tramo } from '../reglas/torre.ts';
+import type { Sonido } from '../sonido/sucesos.ts';
 import type { crearPantallaCarrera } from '../ui/carrera.ts';
 
 export interface OpcionesCarrera {
@@ -43,6 +44,8 @@ export interface OpcionesCarrera {
   pantalla: ReturnType<typeof crearPantallaCarrera>;
   /** Pone al jugador en la salida de su puesto (nueva carrera). */
   alReiniciar(puesto: number): void;
+  /** Cuenta atrás, salida, tu llegada y el final (ganas o no). */
+  sonar?(sonido: Sonido): void;
 }
 
 /** Los que juegan: los 4 más antiguos de la sala, en el orden de la sala. */
@@ -62,6 +65,7 @@ export function crearCarreraEnSala(op: OpcionesCarrera) {
   let contadorLlegadas = 0;
   const yo = () => sala.yo.id;
   const soyAnfitrion = () => sala.anfitrion()?.id === yo();
+  const sonar = (s: Sonido) => op.sonar?.(s);
 
   function apuntarLlegada(id: string, tiempo: number) {
     if (llegadas.some((l) => l.id === id) || !participantes.some((p) => p.id === id)) return;
@@ -71,6 +75,9 @@ export function crearCarreraEnSala(op: OpcionesCarrera) {
   function terminar() {
     if (estado.fase === 'terminada') return;
     estado.fase = 'terminada';
+    // Gana el mejor tiempo; si empatan, quien se supo antes (como clasificar).
+    const primera = [...llegadas].sort((a, b) => a.tiempo - b.tiempo || a.orden - b.orden)[0];
+    sonar(primera?.id === yo() ? 'victoria' : 'finCarrera');
   }
 
   /** Empieza la carrera número `ronda`, con `bots` rivales del ordenador. */
@@ -85,7 +92,11 @@ export function crearCarreraEnSala(op: OpcionesCarrera) {
     contadorLlegadas = 0;
     op.alReiniciar(Math.max(personas.findIndex((m) => m.id === yo()), 0));
     pantalla.cerrarCaja();
-    for (const s of empezarCuentaAtras(estado, ronda)) if (s.tipo === 'numero') pantalla.numero(String(s.numero));
+    for (const s of empezarCuentaAtras(estado, ronda)) {
+      if (s.tipo !== 'numero') continue;
+      pantalla.numero(String(s.numero));
+      sonar('cuenta');
+    }
   }
 
   /** Alturas de los del ordenador (para la lista de la sala). */
@@ -120,13 +131,17 @@ export function crearCarreraEnSala(op: OpcionesCarrera) {
     sePuedeMover: () => sePuedeMover(estado),
     /** Antes del paso del jugador: cuenta atrás y reloj. */
     antesDelPaso(paso: number) {
-      for (const s of pasoCarrera(estado, paso)) pantalla.numero(s.tipo === 'salida' ? '¡YA!' : String(s.numero));
+      for (const s of pasoCarrera(estado, paso)) {
+        pantalla.numero(s.tipo === 'salida' ? '¡YA!' : String(s.numero));
+        sonar(s.tipo === 'salida' ? 'salida' : 'cuenta');
+      }
     },
     /** Después del paso del jugador: su llegada, los del ordenador y el final. */
     despuesDelPaso(paso: number, jugador: Corredor, r: PasoCorredor) {
       if (estado.fase !== 'enCurso' && estado.fase !== 'terminada') return;
       if (r.llego && estado.fase === 'enCurso') {
         apuntarLlegada(yo(), jugador.llegada!);
+        sonar('meta');
         sala.enviarCarrera({ tipo: 'meta', ronda: estado.ronda, tiempo: jugador.llegada! });
       }
       anteriores = delOrdenador.map((b) => ({ x: b.corredor.escalador.x, y: b.corredor.escalador.y, z: b.corredor.escalador.z }));

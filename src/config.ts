@@ -74,4 +74,17 @@ export const CONFIG = {
     recolocar: 1.5,
     esperaRecolocar: 1.2,
   },
+  sonido: {
+    /** Volumen general (0-1) y del fondo de la cueva respecto a los efectos. */
+    volumen: 0.7,
+    ambiente: 0.5,
+    /** Metros corriendo entre un paso y el siguiente (un paso suena cada zancada). */
+    zancada: 1.6,
+    /** Gotas que caen en la cueva, de media, por segundo. */
+    gotasPorSegundo: 0.35,
+    /** Con la pausa abierta (solo) el volumen baja a esta fracción. */
+    enPausa: 0.25,
+    /** Por debajo de esta caída (m) el aterrizaje no suena: es bajar un escalón. */
+    aterrizajeMin: 0.5,
+  },
 } as const;

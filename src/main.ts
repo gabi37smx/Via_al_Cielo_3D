@@ -8,6 +8,9 @@ import { crearRivales } from './mundo/rivales.ts';
 import { crearListaJugadores } from './ui/jugadores.ts';
 import { aspectoGuardado, mostrarMenu, type Eleccion } from './ui/menu.ts';
 import { crearPantallaCompleta } from './ui/pantallaCompleta.ts';
+import { crearBotonSonido } from './ui/botonSonido.ts';
+import { crearAudio } from './sonido/audio.ts';
+import { crearOido, sonidosDelPaso } from './sonido/sucesos.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
 import { REGLAS, generarFragmentos, generarMurcielagos, type Jugada } from './reglas/partida.ts';
@@ -44,6 +47,9 @@ const configRed = configuracionRed();
 const menu = document.querySelector<HTMLElement>('#menu')!;
 // Pantalla completa (botón y tecla F): disponible ya en el menú.
 crearPantallaCompleta(document.querySelector<HTMLButtonElement>('#pantalla-completa')!);
+// Sonido (botón y tecla M): también en el menú, para que el primer clic ya lo active.
+const audio = crearAudio();
+crearBotonSonido(document.querySelector<HTMLButtonElement>('#sonido')!, audio);
 
 // 1 · ¿Solo o en una sala?
 let eleccion: Eleccion;
@@ -137,6 +143,8 @@ let pasosDesdeEnvio = 0;
  * el escalador, así que siempre se lee como `jugador.escalador`.
  */
 let jugador: Corredor;
+/** Lo que recuerda el sonido de un paso al siguiente (los pasos al correr). */
+let oido = crearOido();
 const anterior = { x: 0, y: 0, z: 0 };
 
 /** Al principio, al «volver a jugar» (solo) y en cada salida de carrera (con su puesto). */
@@ -148,6 +156,7 @@ function reiniciar(puestoCarrera?: number) {
   e.orientacion = Math.atan2(Math.cos(angulo), Math.sin(angulo)); // mirando a la pared
   Object.assign(anterior, { x: e.x, y: e.y, z: e.z });
   jugador.partida.alturaMaxima = e.y;
+  oido = crearOido();
   fragmentos.mostrarTodos();
 }
 reiniciar();
@@ -164,6 +173,7 @@ const carrera = sala
         alEmpezar: (conOrdenador) => carrera?.alEmpezar(conOrdenador),
       }),
       alReiniciar: (p) => reiniciar(p),
+      sonar: audio.sonar,
     })
   : null;
 
@@ -171,8 +181,9 @@ const carrera = sala
 //     demás siguen subiendo), pero tu escalador se queda quieto.
 const pausa = crearMenuPausa(document.querySelector<HTMLElement>('#pausa')!, {
   enCarrera: sala !== null,
-  alAbrir: () => {},
-  alCerrar: () => {},
+  // En solo la pausa baja el volumen; en carrera el juego sigue y suena igual.
+  alAbrir: () => sala === null && audio.pausar(true),
+  alCerrar: () => audio.pausar(false),
   async alSalir() {
     try {
       await sala?.salir();
@@ -181,6 +192,9 @@ const pausa = crearMenuPausa(document.querySelector<HTMLElement>('#pausa')!, {
     }
   },
 });
+
+/** Fin de la partida (solo) con récord nuevo: suena «record» en vez de «derrota». */
+let recordEnEstePaso = false;
 
 /** Lo que se ve y se oye reacciona a las jugadas de las reglas. */
 function atender(j: Jugada) {
@@ -207,6 +221,7 @@ function atender(j: Jugada) {
       pausa.bloquear(true);
       const p = jugador.partida;
       const recordNuevo = guardarRecord(p.alturaMaxima);
+      recordEnEstePaso = recordNuevo;
       fin.mostrar({ altura: p.alturaMaxima, fragmentos: p.recogidos.length, segundos: p.tiempo, record: leerRecord(), recordNuevo });
       break;
     }
@@ -247,7 +262,10 @@ const bucle = crearBucle({
     const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso);
     if (r.sucesos.aterrizaje > 0.5) personaje.aterrizar(r.sucesos.aterrizaje / 6);
     if (r.reaparecio) Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
+    recordEnEstePaso = false;
     for (const j of r.jugadas) atender(j);
+    const toques = sonidosDelPaso(oido, r, jugador.escalador, paso);
+    audio.sonarTodos(recordEnEstePaso ? toques.map((t) => (t.sonido === 'derrota' ? { ...t, sonido: 'record' as const } : t)) : toques);
     carrera?.despuesDelPaso(paso, jugador, r);
 
     // 10 veces por segundo, contar a la sala dónde estoy.
@@ -286,6 +304,7 @@ const bucle = crearBucle({
     fragmentos.animar(t);
     murcielagos.actualizar(t);
     rivales.pintar(performance.now(), dtReal);
+    audio.actualizar(dtReal);
     if (sala && lista && carrera) {
       carrera.pintar(alfa, dtReal, jugador, e.y);
       const alturas = new Map([...rivales.alturas(), ...carrera.alturasDelOrdenador(), [sala.yo.id, e.y]]);
@@ -309,6 +328,7 @@ const bucle = crearBucle({
 });
 
 bucle.arrancar();
+audio.empezarAmbiente();
 
 // Para probar desde la consola del navegador (y desde la captura con --js):
 //   juego.danar(50)   quita vida      juego.partida   el estado de las reglas
@@ -327,6 +347,10 @@ Object.assign(window, {
     teletransportar(x: number, y: number, z: number) {
       Object.assign(jugador.escalador, { x, y, z, vx: 0, vy: 0, vz: 0, enSuelo: false });
       Object.assign(anterior, { x, y, z });
+    },
+    /** Sonido: si el navegador ya lo deja sonar («running») y si está silenciado. */
+    get sonido() {
+      return { estado: audio.estado(), silenciado: audio.silenciado() };
     },
     /** El anfitrión empieza la carrera (lo mismo que el botón). */
     empezarCarrera(conOrdenador = true) {
