@@ -13,15 +13,16 @@ import { crearAudio } from './sonido/audio.ts';
 import { crearOido, sonidosDelPaso } from './sonido/sucesos.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
-import { REGLAS, generarFragmentos, generarMurcielagos, type Jugada } from './reglas/partida.ts';
+import { REGLAS, generarFragmentos, generarMurcielagos, murcielagosDelTramo, type Jugada } from './reglas/partida.ts';
 import { crearCorredor, pasoCorredor, type Corredor } from './reglas/carrera.ts';
 import { crearCarreraEnSala } from './modos/carrera.ts';
 import { crearPantallaCarrera } from './ui/carrera.ts';
 import { crearMenuPausa } from './ui/pausa.ts';
-import { alturaSuelo, generarTramo, posicionSaliente, puntoDeSalida } from './reglas/torre.ts';
+import { ESCENARIOS, alturaSueloTorre, generarTramo, posicionSaliente, puntoDeSalida, tramoEnAltura } from './reglas/torre.ts';
 import { crearCamaraTerceraPersona, giroHaciaPared } from './mundo/camara.ts';
 import { crearCueva } from './mundo/cueva.ts';
-import { crearEscena } from './mundo/escena.ts';
+import { crearEscena, mezclaEscenario } from './mundo/escena.ts';
+import { crearEstalactitas, crearGrieta } from './mundo/grieta.ts';
 import { crearFragmentos, crearMurcielagos } from './mundo/objetos.ts';
 import { crearSombra } from './mundo/sombra.ts';
 import { crearTexturaRoca } from './mundo/texturas.ts';
@@ -95,21 +96,35 @@ const fin = crearPantallaFin(document.querySelector<HTMLElement>('#fin')!, () =>
 entrada.alPulsar('F3', panel.alternar);
 window.addEventListener('resize', mundo.redimensionar);
 
-// El mundo: la cueva y el primer tramo de la torre (220 m), con sus objetos.
-const tramo = generarTramo(semilla, 0);
-const suelo = (x: number, z: number, techo: number) => alturaSuelo(tramo, x, z, techo);
+// El mundo: la cueva (0-220 m) y la grieta (220-440 m), con sus objetos.
+// La carrera acaba en el rellano de la cueva (`tramo`); jugando solo se sigue.
+const tramos = ESCENARIOS.map((_, i) => generarTramo(semilla, i));
+const tramo = tramos[0]!;
+const suelo = (x: number, z: number, techo: number) => alturaSueloTorre(tramos, x, z, techo);
 const peligros = {
-  fragmentos: generarFragmentos(semilla, tramo),
-  murcielagos: generarMurcielagos(semilla, tramo, REGLAS.murcielagosCueva),
+  fragmentos: tramos.flatMap((t) => generarFragmentos(semilla, t)),
+  murcielagos: tramos.flatMap((t) => generarMurcielagos(semilla, t, murcielagosDelTramo(t.indice))),
 };
+// Lo que se pisa siempre es más claro que la pared, para verlo de un vistazo.
 const roca = crearTexturaRoca({ oscuro: '#2b2620', claro: '#8c7f6c' });
 const piedra = crearTexturaRoca({ oscuro: '#6b6356', claro: '#d9cdb4', semilla: 7, relieve: 4 });
+const rocaGrieta = crearTexturaRoca({ oscuro: '#8c7b66', claro: '#cdbda5', semilla: 11 });
+const piedraGrieta = crearTexturaRoca({ oscuro: '#7d7a72', claro: '#efebe2', semilla: 13, relieve: 4 });
 const fragmentos = crearFragmentos(peligros.fragmentos);
 const murcielagos = crearMurcielagos(peligros.murcielagos);
-mundo.escena.add(crearCueva(mundo.escena, roca, tramo), crearTorre(tramo, piedra), fragmentos.grupo, murcielagos.grupo);
+mundo.escena.add(
+  crearCueva(roca, tramo),
+  crearTorre(tramo, piedra),
+  crearEstalactitas(tramo, 0x5a5146, 2201), // el techo de la cueva
+  crearGrieta(rocaGrieta, tramos[1]!),
+  crearTorre(tramos[1]!, piedraGrieta),
+  fragmentos.grupo,
+  murcielagos.grupo,
+);
 
 // Dónde empieza: en el suelo antes del primer saliente, o en el saliente pedido con ?altura.
-const inicio = tramo.salientes.find((s) => s.y >= alturaInicial) ?? tramo.salientes[0]!;
+const todos = tramos.flatMap((t) => t.salientes);
+const inicio = todos.find((s) => s.y >= alturaInicial) ?? todos[0]!;
 const enSuelo = puntoDeSalida(tramo, puesto);
 const salida = alturaInicial > 0 ? { ...posicionSaliente(inicio), y: inicio.y } : { x: enSuelo.x, z: enSuelo.z, y: 0 };
 
@@ -145,6 +160,8 @@ let pasosDesdeEnvio = 0;
 let jugador: Corredor;
 /** Lo que recuerda el sonido de un paso al siguiente (los pasos al correr). */
 let oido = crearOido();
+/** El tramo más alto al que ha llegado (para avisar al entrar en uno nuevo). */
+let tramoAlcanzado = 0;
 const anterior = { x: 0, y: 0, z: 0 };
 
 /** Al principio, al «volver a jugar» (solo) y en cada salida de carrera (con su puesto). */
@@ -156,6 +173,7 @@ function reiniciar(puestoCarrera?: number) {
   e.orientacion = Math.atan2(Math.cos(angulo), Math.sin(angulo)); // mirando a la pared
   Object.assign(anterior, { x: e.x, y: e.y, z: e.z });
   jugador.partida.alturaMaxima = e.y;
+  tramoAlcanzado = tramoEnAltura(e.y);
   oido = crearOido();
   fragmentos.mostrarTodos();
 }
@@ -268,6 +286,14 @@ const bucle = crearBucle({
     audio.sonarTodos(recordEnEstePaso ? toques.map((t) => (t.sonido === 'derrota' ? { ...t, sonido: 'record' as const } : t)) : toques);
     carrera?.despuesDelPaso(paso, jugador, r);
 
+    // Jugando solo, al subir al rellano de los 220 m empieza la grieta.
+    const enTramo = tramoEnAltura(jugador.partida.alturaMaxima);
+    if (!carrera && enTramo > tramoAlcanzado) {
+      tramoAlcanzado = enTramo;
+      hud.avisar(`Tramo ${enTramo + 1} · ${ESCENARIOS[enTramo]}`, 'bueno');
+      audio.sonar('tramo');
+    }
+
     // 10 veces por segundo, contar a la sala dónde estoy.
     const e = jugador.escalador;
     if (sala && ++pasosDesdeEnvio >= PASOS_POR_ENVIO) {
@@ -304,7 +330,9 @@ const bucle = crearBucle({
     fragmentos.animar(t);
     murcielagos.actualizar(t);
     rivales.pintar(performance.now(), dtReal);
-    audio.actualizar(dtReal);
+    const mezcla = mezclaEscenario(pintado.y);
+    mundo.ambientar(mezcla);
+    audio.actualizar(dtReal, mezcla);
     if (sala && lista && carrera) {
       carrera.pintar(alfa, dtReal, jugador, e.y);
       const alturas = new Map([...rivales.alturas(), ...carrera.alturasDelOrdenador(), [sala.yo.id, e.y]]);
@@ -314,12 +342,14 @@ const bucle = crearBucle({
     mundo.pintar(pintado);
     fps.contar(dtReal);
     panel.actualizar(dtReal, { semilla, altura: e.y, postura: e.postura });
+    // Los fragmentos son por tramo (3 en cada uno): se cuentan los del tramo en el que estás.
+    const enTramo = tramoEnAltura(e.y);
     hud.actualizar({
       vida: partida.vida,
       altura: e.y,
       record: Math.max(leerRecord(), partida.alturaMaxima),
-      fragmentos: partida.recogidos.length,
-      tramo: carrera ? 'Carrera · meta a 220 m' : 'Tramo 1 · La cueva',
+      fragmentos: partida.recogidos.filter((id) => Math.floor(id / 10) === enTramo).length,
+      tramo: carrera ? 'Carrera · meta a 220 m' : `Tramo ${enTramo + 1} · ${ESCENARIOS[enTramo]}`,
     });
 
     // Aviso para herramientas/captura.mjs: la escena ya se ha pintado varias veces.
@@ -347,6 +377,10 @@ Object.assign(window, {
     teletransportar(x: number, y: number, z: number) {
       Object.assign(jugador.escalador, { x, y, z, vx: 0, vy: 0, vz: 0, enSuelo: false });
       Object.assign(anterior, { x, y, z });
+    },
+    /** Gira la cámara (rad): para las capturas, p. ej. mirar hacia arriba con `juego.girarCamara(0, -0.5)`. */
+    girarCamara(giro: number, inclinacion: number) {
+      camara.girar(giro, inclinacion);
     },
     /** Sonido: si el navegador ya lo deja sonar («running») y si está silenciado. */
     get sonido() {

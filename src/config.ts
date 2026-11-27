@@ -80,8 +80,11 @@ export const CONFIG = {
     ambiente: 0.5,
     /** Metros corriendo entre un paso y el siguiente (un paso suena cada zancada). */
     zancada: 1.6,
-    /** Gotas que caen en la cueva, de media, por segundo. */
+    /** Gotas que caen en la cueva, de media, por segundo (en la grieta, la mitad). */
     gotasPorSegundo: 0.35,
+    /** Hasta qué frecuencia (Hz) se oye el rumor de fondo: grave en la cueva, más abierto en la grieta. */
+    filtroCueva: 220,
+    filtroGrieta: 480,
     /** Con la pausa abierta (solo) el volumen baja a esta fracción. */
     enPausa: 0.25,
     /** Por debajo de esta caída (m) el aterrizaje no suena: es bajar un escalón. */

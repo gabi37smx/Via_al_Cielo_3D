@@ -26,6 +26,7 @@ export const SONIDOS = [
   'derrota',
   'record',
   'reaparecer',
+  'tramo',
   'cuenta',
   'salida',
   'meta',

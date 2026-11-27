@@ -27,6 +27,11 @@ export const REGLAS = {
    * Con 40 vuelve a ~2 (200 torres simuladas): un primer tramo suave.
    */
   murcielagosCueva: 40,
+  /**
+   * En la grieta, menos: el 2D tenía 15 en vez de 25 (la cueva clara da un
+   * respiro). La misma proporción sobre los 40 de la cueva: 24.
+   */
+  murcielagosGrieta: 24,
   /** Distancia (m) al centro del cuerpo para coger un fragmento. */
   radioRecoger: 1.1,
   /** Distancia (m) entre el murciélago y el centro del cuerpo para que golpee. */
@@ -100,6 +105,11 @@ export function generarMurcielagos(semilla: number, tramo: Tramo, cantidad: numb
     const sentido = azar() < 0.5 ? -1 : 1;
     return { id: tramo.indice * 100 + i, y, radio, fase, velocidad: (sentido * rapidez) / radio, vaiven: entre(azar, 0.3, 0.9) };
   });
+}
+
+/** Murciélagos de cada tramo (0 = la cueva, 1 = la grieta). */
+export function murcielagosDelTramo(indice: number): number {
+  return indice === 0 ? REGLAS.murcielagosCueva : REGLAS.murcielagosGrieta;
 }
 
 export function posicionMurcielago(m: Murcielago, tiempo: number): Punto {
