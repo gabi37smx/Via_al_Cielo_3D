@@ -11,7 +11,8 @@
     "test": "vitest run",
     "captura": "node herramientas/captura.mjs",
     "simular": "node herramientas/simular.ts",
-    "prueba-red": "node herramientas/prueba-red.mjs"
+    "prueba-red": "node herramientas/prueba-red.mjs",
+    "sonidos": "node herramientas/sonidos.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

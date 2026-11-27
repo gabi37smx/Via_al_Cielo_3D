@@ -72,7 +72,7 @@ export function mostrarMenu(raiz: HTMLElement, hayRed: boolean, error = ''): Pro
         </div>
         ${hayRed ? '' : '<p class="menu-aviso">Carrera no disponible: falta configurar Supabase (.env)</p>'}
       </div>
-      <p class="menu-teclas">Jugando: <b>P</b> pausa · <b>Esc</b> suelta el ratón · <b>F</b> pantalla completa</p>
+      <p class="menu-teclas">Jugando: <b>P</b> pausa · <b>Esc</b> suelta el ratón · <b>F</b> pantalla completa · <b>M</b> sonido</p>
     </div>`;
   raiz.hidden = false;
   const $ = <T extends HTMLElement>(s: string) => raiz.querySelector<T>(s)!;

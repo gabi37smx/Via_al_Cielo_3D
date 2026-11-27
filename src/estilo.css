@@ -410,6 +410,7 @@ body {
 
 /* ---------- Pantalla completa ---------- */
 
+#sonido,
 #pantalla-completa {
   position: fixed;
   right: 10px;
@@ -426,17 +427,26 @@ body {
   cursor: pointer;
 }
 
+#sonido:hover,
 #pantalla-completa:hover {
   background: rgb(0 0 0 / 0.8);
 }
 
+#sonido:focus-visible,
 #pantalla-completa:focus-visible {
   outline: 3px solid #f5c518;
   outline-offset: 2px;
 }
 
+#sonido[hidden],
 #pantalla-completa[hidden] {
   display: none;
+}
+
+/* El de sonido, a la izquierda del de pantalla completa. */
+#sonido {
+  right: 58px;
+  font-size: 20px;
 }
 
 /* ---------- Carrera (sesión 6) ---------- */

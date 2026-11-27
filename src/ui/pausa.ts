@@ -25,6 +25,7 @@ const CONTROLES = (enCarrera: boolean): [string, string][] => [
   ['Ratón / Q y E', 'girar la cámara (clic para capturar el ratón)'],
   ['Esc', 'soltar el ratón'],
   ['F', 'pantalla completa'],
+  ['M', 'silenciar o activar el sonido'],
   ['P', enCarrera ? 'menú (la carrera no se para)' : 'pausa'],
 ];
 
