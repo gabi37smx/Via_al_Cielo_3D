@@ -12,9 +12,12 @@ import {
   generarMurcielagos,
   murcielagosDelTramo,
   pasoPartida,
+  type Peligros,
 } from '../reglas/partida.ts';
+import { INDICE_LADERA, alturaSueloLadera, generarLadera, limiteMundo, salidaLadera, type Limite } from '../reglas/ladera.ts';
+import { generarFragmentosLadera } from '../reglas/partida.ts';
 import { alturaSuelo, generarTramo, puntoDeSalida } from '../reglas/torre.ts';
-import { crearCerebro } from './cerebro.ts';
+import { crearCerebro, siguienteObjetivoLadera, type Cerebro } from './cerebro.ts';
 
 export interface ResultadoSimulacion {
   semilla: number;
@@ -43,26 +46,57 @@ export interface OpcionesSimulacion {
   limite?: number;
 }
 
-export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): ResultadoSimulacion {
-  const tramo = generarTramo(semilla, op.tramo ?? 0);
-  const suelo = (x: number, z: number, techo: number) => alturaSuelo(tramo, x, z, techo);
-  const peligros = {
-    fragmentos: generarFragmentos(semilla, tramo),
-    murcielagos: generarMurcielagos(semilla, tramo, op.murcielagos ?? murcielagosDelTramo(tramo.indice)),
+/** Lo que necesita la simulación de un tramo: dónde se pisa, por dónde no se pasa, peligros, salida y cerebro. */
+interface Escenario {
+  base: number;
+  rellano: number;
+  suelo: (x: number, z: number, techo: number) => number;
+  limite?: Limite;
+  peligros: Peligros;
+  salida: { x: number; z: number };
+  cerebro: Cerebro;
+}
+
+function escenario(semilla: number, indice: number, murcielagos?: number): Escenario {
+  if (indice === INDICE_LADERA) {
+    const l = generarLadera(semilla);
+    return {
+      base: l.base,
+      rellano: l.rellano,
+      suelo: (x, z, techo) => alturaSueloLadera(l, x, z, techo),
+      limite: limiteMundo(l),
+      peligros: { fragmentos: generarFragmentosLadera(semilla, l), murcielagos: [] },
+      salida: salidaLadera(l),
+      cerebro: crearCerebro((e, apoyo) => siguienteObjetivoLadera(e, l, apoyo)),
+    };
+  }
+  const tramo = generarTramo(semilla, indice);
+  return {
+    base: tramo.base,
+    rellano: tramo.rellano,
+    suelo: (x, z, techo) => alturaSuelo(tramo, x, z, techo),
+    peligros: {
+      fragmentos: generarFragmentos(semilla, tramo),
+      murcielagos: generarMurcielagos(semilla, tramo, murcielagos ?? murcielagosDelTramo(tramo.indice)),
+    },
+    salida: puntoDeSalida(tramo),
+    cerebro: crearCerebro(tramo),
   };
-  const salida = puntoDeSalida(tramo);
-  const e = crearEscalador(salida.x, tramo.base, salida.z);
+}
+
+export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): ResultadoSimulacion {
+  const { base, rellano, suelo, limite, peligros, salida, cerebro } = escenario(semilla, op.tramo ?? 0, op.murcielagos);
+  const e = crearEscalador(salida.x, base, salida.z);
   const partida = crearPartida();
-  partida.alturaMaxima = tramo.base;
+  partida.alturaMaxima = base;
   const r: ResultadoSimulacion = {
     semilla, llego: false, murio: false, segundos: 0, saltos: 0, doblesSaltos: 0,
     agarres: 0, tropiezos: 0, golpes: 0, fragmentos: 0, vida: 100,
   };
 
-  const cerebro = crearCerebro(tramo);
-  const limite = op.limite ?? 300;
-  for (let t = 0; t < limite; t += PASO) {
-    const sucesos = pasoEscalador(e, cerebro.pensar(e), suelo, PASO);
+  const tope = op.limite ?? 300;
+  for (let t = 0; t < tope; t += PASO) {
+    const sucesos = pasoEscalador(e, cerebro.pensar(e), suelo, PASO, limite);
     if (sucesos.salto) r.saltos++;
     if (sucesos.dobleSalto) r.doblesSaltos++;
     if (sucesos.agarre) r.agarres++;
@@ -73,7 +107,7 @@ export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): Res
       r.murio = true;
       break;
     }
-    if (e.enSuelo && e.y >= tramo.rellano - 1e-6) {
+    if (e.enSuelo && e.y >= rellano - 1e-6) {
       r.llego = true;
       break;
     }

@@ -10,6 +10,7 @@
  */
 import { crearAzar, derivarSemilla, entre } from './azar.ts';
 import { RADIO_PARED, puntoEnAngulo, type Tramo } from './torre.ts';
+import { aMundo, dCara, type Ladera } from './ladera.ts';
 
 export const REGLAS = {
   vidaInicial: 100,
@@ -87,6 +88,23 @@ export function generarFragmentos(semilla: number, tramo: Tramo): Fragmento[] {
   return fragmentos;
 }
 
+/** Lo mismo en la ladera: uno por tercio, flotando sobre un saliente (ids 20, 21, 22). */
+export function generarFragmentosLadera(semilla: number, l: Ladera): Fragmento[] {
+  const azar = crearAzar(derivarSemilla(semilla, 1000 + l.indice));
+  const n = REGLAS.fragmentosPorTramo;
+  const alto = l.rellano - l.base;
+  const fragmentos: Fragmento[] = [];
+  for (let i = 0; i < n; i++) {
+    const desde = l.base + (alto * i) / n;
+    const hasta = l.base + (alto * (i + 1)) / n;
+    const candidatos = l.salientes.filter((s) => s.y > desde + 5 && s.y < hasta && s.tipo !== 'descansillo');
+    if (candidatos.length === 0) continue;
+    const s = candidatos[Math.floor(azar() * candidatos.length)]!;
+    fragmentos.push({ id: l.indice * 10 + i, ...aMundo(l, dCara(s.y) - 0.8, s.u), y: s.y + 1.2 });
+  }
+  return fragmentos;
+}
+
 /** Murciélagos dando vueltas al pozo pegados a la pared, repartidos por la altura del tramo. */
 export function generarMurcielagos(semilla: number, tramo: Tramo, cantidad: number): Murcielago[] {
   const azar = crearAzar(derivarSemilla(semilla, 2000 + tramo.indice));
@@ -107,9 +125,9 @@ export function generarMurcielagos(semilla: number, tramo: Tramo, cantidad: numb
   });
 }
 
-/** Murciélagos de cada tramo (0 = la cueva, 1 = la grieta). */
+/** Murciélagos de cada tramo (0 = la cueva, 1 = la grieta; fuera, en la montaña, ninguno). */
 export function murcielagosDelTramo(indice: number): number {
-  return indice === 0 ? REGLAS.murcielagosCueva : REGLAS.murcielagosGrieta;
+  return indice === 0 ? REGLAS.murcielagosCueva : indice === 1 ? REGLAS.murcielagosGrieta : 0;
 }
 
 export function posicionMurcielago(m: Murcielago, tiempo: number): Punto {

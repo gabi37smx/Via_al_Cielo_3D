@@ -73,6 +73,8 @@ export const CONFIG = {
      */
     recolocar: 1.5,
     esperaRecolocar: 1.2,
+    /** Fuera (la ladera), la cámara mira más de frente para ver la montaña y el cielo (rad). */
+    inclinacionFuera: 0.08,
   },
   sonido: {
     /** Volumen general (0-1) y del fondo de la cueva respecto a los efectos. */
@@ -85,6 +87,7 @@ export const CONFIG = {
     /** Hasta qué frecuencia (Hz) se oye el rumor de fondo: grave en la cueva, más abierto en la grieta. */
     filtroCueva: 220,
     filtroGrieta: 480,
+    filtroExterior: 1300,
     /** Con la pausa abierta (solo) el volumen baja a esta fracción. */
     enPausa: 0.25,
     /** Por debajo de esta caída (m) el aterrizaje no suena: es bajar un escalón. */

@@ -30,7 +30,7 @@ const FORMAS = 3;
  * Una roca de 1×1×1 con la cara de arriba en y = 0 (plana, sin tocar) y el
  * resto hacia abajo, deformado.
  */
-function crearForma(semilla: number): THREE.BufferGeometry {
+export function crearForma(semilla: number): THREE.BufferGeometry {
   const geometria = new THREE.BoxGeometry(1, 1, 1, 4, 3, 4);
   geometria.translate(0, -0.5, 0); // arriba en y = 0, abajo en y = −1
   const azar = crearAzar(semilla);

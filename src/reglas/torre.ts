@@ -23,9 +23,10 @@ export const METROS_POR_TRAMO = 220;
 /**
  * Los tramos que hay, en orden (decisión 024: sin repetir escenario). El 2D
  * tenía 2 pantallas de cada cueva; aquí cada una es UN tramo de 220 m, porque
- * en 3D cada tramo ya son ~90 salientes y más de un minuto de subida.
+ * en 3D cada tramo ya son ~90 salientes y más de un minuto de subida. Los dos
+ * primeros son el pozo (este archivo); el tercero, la ladera (ladera.ts).
  */
-export const ESCENARIOS = ['La cueva', 'La grieta'] as const;
+export const ESCENARIOS = ['La cueva', 'La grieta', 'Aire libre'] as const;
 
 /** En qué tramo se está a la altura `y` (0 = la cueva). Encima del último, el último. */
 export function tramoEnAltura(y: number): number {

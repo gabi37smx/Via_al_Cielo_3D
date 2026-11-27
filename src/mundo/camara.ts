@@ -50,16 +50,20 @@ export interface CamaraTerceraPersona {
   girar(dGiro: number, dInclinacion: number): void;
   /**
    * Llamar en cada paso de la lógica con la posición del escalador: si nadie
-   * ha tocado la cámara en un rato, la vuelve poco a poco hacia la pared.
+   * ha tocado la cámara en un rato, la vuelve poco a poco hacia la pared (o
+   * hacia `ideal`, si se da: fuera, detrás del escalador mirando a la montaña).
    */
-  recolocar(x: number, z: number, paso: number): void;
-  /** Llamar al pintar con la posición (interpolada) de los pies del escalador. */
-  seguir(x: number, y: number, z: number, dt: number): void;
+  recolocar(x: number, z: number, paso: number, ideal?: number, inclinacionIdeal?: number): void;
+  /**
+   * Llamar al pintar con la posición (interpolada) de los pies del escalador.
+   * `acortar` (fuera del pozo): qué fracción del segmento mira → cámara se puede usar sin meterse en la roca.
+   */
+  seguir(x: number, y: number, z: number, dt: number, acortar?: (mira: THREE.Vector3Like, camara: THREE.Vector3Like) => number): void;
 }
 
-export function crearCamaraTerceraPersona(camara: THREE.PerspectiveCamera, giroInicial = 0): CamaraTerceraPersona {
+export function crearCamaraTerceraPersona(camara: THREE.PerspectiveCamera, giroInicial = 0, inclinacionInicial: number = C.inclinacion): CamaraTerceraPersona {
   let giro = giroInicial;
-  let inclinacion: number = C.inclinacion;
+  let inclinacion = inclinacionInicial;
   /** Segundos desde la última vez que se giró la cámara a mano. */
   let sinTocar = 0;
   const mira = new THREE.Vector3();
@@ -74,15 +78,18 @@ export function crearCamaraTerceraPersona(camara: THREE.PerspectiveCamera, giroI
       giro += dGiro;
       inclinacion = Math.min(Math.max(inclinacion + dInclinacion, C.inclinacionMin), C.inclinacionMax);
     },
-    recolocar(x, z, paso) {
+    recolocar(x, z, paso, ideal, inclinacionIdeal) {
       sinTocar += paso;
       // En el centro del pozo no hay «hacia la pared»: se deja como está.
-      if (sinTocar < C.esperaRecolocar || Math.hypot(x, z) < 1) return;
-      let falta = giroHaciaPared(x, z) - giro;
+      if (sinTocar < C.esperaRecolocar || (ideal === undefined && Math.hypot(x, z) < 1)) return;
+      let falta = (ideal ?? giroHaciaPared(x, z)) - giro;
       falta = Math.atan2(Math.sin(falta), Math.cos(falta)); // el camino corto
-      giro += falta * (1 - Math.exp(-C.recolocar * paso));
+      const f = 1 - Math.exp(-C.recolocar * paso);
+      giro += falta * f;
+      // También la inclinación (fuera mira más de frente: se ve la montaña y el cielo).
+      inclinacion += ((inclinacionIdeal ?? C.inclinacion) - inclinacion) * f;
     },
-    seguir(x, y, z, dt) {
+    seguir(x, y, z, dt, acortar) {
       const objetivoY = y + C.alturaMira;
       if (primera) {
         mira.set(x, objetivoY, z);
@@ -100,8 +107,9 @@ export function crearCamaraTerceraPersona(camara: THREE.PerspectiveCamera, giroI
       let cz = mira.z + Math.cos(giro) * horizontal;
       let cy = mira.y + Math.sin(inclinacion) * C.distancia;
 
-      // Que no se meta en la pared del pozo.
-      const t = acortarPorPared(mira.x, mira.z, cx, cz, RADIO_PARED - C.margenPared);
+      // Que no se meta en la pared del pozo (solo dentro del pozo: fuera no hay pared detrás).
+      const enPozo = Math.hypot(mira.x, mira.z) < RADIO_PARED - C.margenPared;
+      const t = enPozo ? acortarPorPared(mira.x, mira.z, cx, cz, RADIO_PARED - C.margenPared) : (acortar?.(mira, { x: cx, y: cy, z: cz }) ?? 1);
       if (t < 1) {
         cx = mira.x + (cx - mira.x) * t;
         cz = mira.z + (cz - mira.z) * t;

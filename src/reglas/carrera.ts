@@ -13,6 +13,7 @@
 import { crearEscalador, pasoEscalador, type Escalador, type Ordenes, type Suelo, type Sucesos } from '../jugador/control.ts';
 import { REGLAS, crearPartida, pasoPartida, type Jugada, type Partida, type Peligros } from './partida.ts';
 import { puntoDeSalida, posicionSaliente, type Tramo } from './torre.ts';
+import type { Limite } from './ladera.ts';
 
 export const CARRERA = {
   /** Segundos de cuenta atrás (3, 2, 1, ¡ya!). */
@@ -144,12 +145,13 @@ export function pasoCorredor(
   peligros: Peligros,
   tiempo: number,
   paso: number,
+  limite?: Limite,
 ): PasoCorredor {
   const r: PasoCorredor = { sucesos: { salto: false, dobleSalto: false, aterrizaje: 0, agarre: false }, jugadas: [], llego: false, reaparecio: false };
 
   if (c.reaparecerEn > 0) {
     // Sin vida: no obedece, pero termina de caer si estaba en el aire.
-    r.sucesos = pasoEscalador(c.escalador, { ...QUIETO, giroCamara: ordenes.giroCamara }, suelo, paso);
+    r.sucesos = pasoEscalador(c.escalador, { ...QUIETO, giroCamara: ordenes.giroCamara }, suelo, paso, limite);
     c.reaparecerEn = Math.max(c.reaparecerEn - paso, 0);
     if (c.reaparecerEn === 0) {
       const sitio = sitioDeReaparicion(tramo, c.partida.alturaMaxima, c.puesto);
@@ -164,7 +166,7 @@ export function pasoCorredor(
     return r;
   }
 
-  r.sucesos = pasoEscalador(c.escalador, ordenes, suelo, paso);
+  r.sucesos = pasoEscalador(c.escalador, ordenes, suelo, paso, limite);
   const e = c.escalador;
   r.jugadas = pasoPartida(c.partida, { x: e.x, y: e.y, z: e.z, aterrizaje: r.sucesos.aterrizaje }, peligros, paso);
   if (r.jugadas.some((j) => j.tipo === 'fin')) c.reaparecerEn = CARRERA.reaparicion;
