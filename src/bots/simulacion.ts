@@ -7,10 +7,10 @@
 import { crearEscalador, pasoEscalador } from '../jugador/control.ts';
 import { PASO } from '../nucleo/bucle.ts';
 import {
-  REGLAS,
   crearPartida,
   generarFragmentos,
   generarMurcielagos,
+  murcielagosDelTramo,
   pasoPartida,
 } from '../reglas/partida.ts';
 import { alturaSuelo, generarTramo, puntoDeSalida } from '../reglas/torre.ts';
@@ -35,21 +35,25 @@ export interface ResultadoSimulacion {
 }
 
 export interface OpcionesSimulacion {
+  /** Qué tramo se sube (0 = la cueva, 1 = la grieta). */
+  tramo?: number;
+  /** Sin él, los del tramo (`murcielagosDelTramo`). */
   murcielagos?: number;
   /** Corta si tarda más (s). */
   limite?: number;
 }
 
 export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): ResultadoSimulacion {
-  const tramo = generarTramo(semilla, 0);
+  const tramo = generarTramo(semilla, op.tramo ?? 0);
   const suelo = (x: number, z: number, techo: number) => alturaSuelo(tramo, x, z, techo);
   const peligros = {
     fragmentos: generarFragmentos(semilla, tramo),
-    murcielagos: generarMurcielagos(semilla, tramo, op.murcielagos ?? REGLAS.murcielagosCueva),
+    murcielagos: generarMurcielagos(semilla, tramo, op.murcielagos ?? murcielagosDelTramo(tramo.indice)),
   };
   const salida = puntoDeSalida(tramo);
-  const e = crearEscalador(salida.x, 0, salida.z);
+  const e = crearEscalador(salida.x, tramo.base, salida.z);
   const partida = crearPartida();
+  partida.alturaMaxima = tramo.base;
   const r: ResultadoSimulacion = {
     semilla, llego: false, murio: false, segundos: 0, saltos: 0, doblesSaltos: 0,
     agarres: 0, tropiezos: 0, golpes: 0, fragmentos: 0, vida: 100,

@@ -21,6 +21,18 @@ import { crearAzar, derivarSemilla, entre, type Azar } from './azar.ts';
 export const METROS_POR_TRAMO = 220;
 
 /**
+ * Los tramos que hay, en orden (decisión 024: sin repetir escenario). El 2D
+ * tenía 2 pantallas de cada cueva; aquí cada una es UN tramo de 220 m, porque
+ * en 3D cada tramo ya son ~90 salientes y más de un minuto de subida.
+ */
+export const ESCENARIOS = ['La cueva', 'La grieta'] as const;
+
+/** En qué tramo se está a la altura `y` (0 = la cueva). Encima del último, el último. */
+export function tramoEnAltura(y: number): number {
+  return Math.min(Math.max(Math.floor(y / METROS_POR_TRAMO), 0), ESCENARIOS.length - 1);
+}
+
+/**
  * Radio de la pared que se escala = hasta dónde se puede llegar (m). Con 12 m
  * caben ~30 salientes por vuelta (3 vueltas por tramo) y desde un lado se ve
  * la pared de enfrente; con 22 m la espiral casi no se notaba.
@@ -162,6 +174,17 @@ export function alturaSuelo(tramo: Tramo, x: number, z: number, techo: number, m
   return mejor;
 }
 
+/** Como `alturaSuelo`, pero con varios tramos uno encima de otro (el más alto que haya debajo). */
+export function alturaSueloTorre(tramos: readonly Tramo[], x: number, z: number, techo: number, margen = 0): number {
+  let mejor = -Infinity;
+  for (const t of tramos) {
+    // Un tramo que empieza por encima del techo no puede tener nada debajo.
+    if (t.base > techo) continue;
+    mejor = Math.max(mejor, alturaSuelo(t, x, z, techo, margen));
+  }
+  return mejor;
+}
+
 /**
  * Hueco en horizontal (m, a lo largo de la pared) entre el borde de `a` y el
  * de `b`, el siguiente. Negativo si se solapan.
@@ -175,11 +198,12 @@ export function huecoEntre(a: Saliente, b: Saliente): number {
 /**
  * Dónde se empieza: en el suelo, entre el centro y la pared, un poco antes
  * del primer saliente. `puesto` separa a los jugadores de una carrera (0-3)
- * para que no salgan unos encima de otros.
+ * para que no salgan unos encima de otros. En los tramos de arriba no hay
+ * suelo entero, solo la cornisa del rellano: se sale desde el medio de ella.
  */
 export function puntoDeSalida(tramo: Tramo, puesto = 0): { x: number; z: number; angulo: number } {
   const primero = tramo.salientes[0]!;
-  const radio = RADIO_PARED - 3.5;
+  const radio = tramo.indice === 0 ? RADIO_PARED - 3.5 : RADIO_PARED - FONDO_RELLANO / 2;
   // Unos 2,5 m de pared antes del borde del primer saliente, y 2,7 m más por cada puesto.
   const angulo = primero.angulo - (primero.ancho / 2 + 2.5 + puesto * 2.7) / RADIO_CAMINO;
   return { ...puntoEnAngulo(angulo, radio), angulo };

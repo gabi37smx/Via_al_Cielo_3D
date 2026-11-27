@@ -22,7 +22,8 @@ export function crearAudio() {
   let silencio = localStorage.getItem(CLAVE) === 'no';
   let enPausa = false;
   let ambienteQuerido = false;
-  let pararAmbiente: (() => void) | null = null;
+  let ambiente: ReturnType<typeof crearAmbienteCueva> | null = null;
+  let ultimoFiltro: number = S.filtroCueva;
   const avisos = new Set<(silencio: boolean) => void>();
 
   const volumenMaestro = () => (silencio ? 0 : S.volumen * (enPausa ? S.enPausa : 1));
@@ -50,7 +51,7 @@ export function crearAudio() {
     fondo = ctx.createGain();
     fondo.gain.value = S.ambiente;
     fondo.connect(maestro);
-    if (ambienteQuerido) pararAmbiente = crearAmbienteCueva(ctx, fondo);
+    if (ambienteQuerido) ambiente = crearAmbienteCueva(ctx, fondo);
   }
   window.addEventListener('pointerdown', arrancar);
   window.addEventListener('keydown', arrancar);
@@ -74,12 +75,22 @@ export function crearAudio() {
     /** Empieza el fondo de la cueva (o en cuanto se pueda sonar). */
     empezarAmbiente() {
       ambienteQuerido = true;
-      if (ctx && fondo && !pararAmbiente) pararAmbiente = crearAmbienteCueva(ctx, fondo);
+      if (ctx && fondo && !ambiente) ambiente = crearAmbienteCueva(ctx, fondo);
     },
-    /** En cada fotograma: de vez en cuando cae una gota en la cueva. */
-    actualizar(dt: number) {
+    /**
+     * En cada fotograma: de vez en cuando cae una gota. `grieta` (0-1): en la
+     * grieta el rumor suena más abierto y caen la mitad de gotas.
+     */
+    actualizar(dt: number, grieta = 0) {
+      const filtro = S.filtroCueva + (S.filtroGrieta - S.filtroCueva) * grieta;
+      // Solo cuando cambia de verdad: cada orden se queda apuntada en el AudioContext.
+      if (ctx && ambiente && Math.abs(filtro - ultimoFiltro) > 2) {
+        ultimoFiltro = filtro;
+        ambiente.filtro.frequency.setTargetAtTime(filtro, ctx.currentTime, 0.5);
+      }
       if (!ambienteQuerido || enPausa) return;
-      if (Math.random() < S.gotasPorSegundo * Math.min(dt, 0.1)) sonar('gota', 0.4 + Math.random() * 0.6);
+      const gotas = S.gotasPorSegundo * (1 - grieta * 0.5);
+      if (Math.random() < gotas * Math.min(dt, 0.1)) sonar('gota', 0.4 + Math.random() * 0.6);
     },
     /** Pausa (solo): baja el volumen y no caen gotas. */
     pausar(si: boolean) {

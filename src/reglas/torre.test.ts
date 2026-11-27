@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { crearAzar } from './azar.ts';
 import {
+  ESCENARIOS,
   METROS_ENTRE_DESCANSILLOS,
   METROS_POR_TRAMO,
   RADIO_PARED,
@@ -9,10 +10,12 @@ import {
   SUBIDA_MIN,
   TIPOS,
   alturaSuelo,
+  alturaSueloTorre,
   generarTramo,
   huecoEntre,
   posicionSaliente,
   puntoDeSalida,
+  tramoEnAltura,
   type TipoSaliente,
 } from './torre.ts';
 
@@ -182,6 +185,38 @@ describe('generarTramo', () => {
         expect(alturaSuelo(t, x, z, 100)).toBe(0);
       }
     }
+  });
+
+  it('en los tramos de arriba se sale desde la cornisa del rellano (no en el aire)', () => {
+    for (const s of SEMILLAS) {
+      const t = generarTramo(s, 1);
+      for (let puesto = 0; puesto < 4; puesto++) {
+        const { x, z } = puntoDeSalida(t, puesto);
+        expect(alturaSuelo(t, x, z, t.base + 0.01)).toBe(t.base);
+      }
+    }
+  });
+
+  it('alturaSueloTorre junta los tramos: la cornisa de 220 m es el techo de la cueva y el suelo de la grieta', () => {
+    const tramos = [generarTramo(3, 0), generarTramo(3, 1)];
+    const [cueva, grieta] = tramos;
+    const r = RADIO_RELLANO + 1;
+    expect(alturaSueloTorre(tramos, r, 0, 300)).toBeGreaterThanOrEqual(220);
+    expect(alturaSueloTorre(tramos, r, 0, 219)).toBeLessThan(220);
+    // Encima de cualquier saliente de la grieta, su altura; y debajo, lo de la cueva.
+    const s = grieta!.salientes[10]!;
+    const { x, z } = posicionSaliente(s);
+    expect(alturaSueloTorre(tramos, x, z, s.y + 0.01)).toBe(s.y);
+    expect(alturaSueloTorre(tramos, 0, 0, 100)).toBe(alturaSuelo(cueva!, 0, 0, 100));
+  });
+
+  it('tramoEnAltura: 0 en la cueva, 1 en la grieta y el último por encima', () => {
+    expect(tramoEnAltura(0)).toBe(0);
+    expect(tramoEnAltura(219.9)).toBe(0);
+    expect(tramoEnAltura(220)).toBe(1);
+    expect(tramoEnAltura(439)).toBe(1);
+    expect(tramoEnAltura(1000)).toBe(ESCENARIOS.length - 1);
+    expect(tramoEnAltura(-5)).toBe(0);
   });
 
   it('un tramo tiene entre 73 y 110 salientes: ni un paseo ni eterno', () => {

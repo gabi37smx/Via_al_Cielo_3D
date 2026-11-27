@@ -121,6 +121,7 @@ export const DURACION: Record<Sonido, number> = {
   derrota: 1.3,
   record: 1.5,
   reaparecer: 0.6,
+  tramo: 1.4,
   cuenta: 0.25,
   salida: 0.6,
   meta: 1,
@@ -210,6 +211,12 @@ export function tocar(ctx: Contexto, destino: AudioNode, sonido: Sonido, t0: num
       tono(ctx, destino, { desde: 400, hasta: 1600, t0, dur: 0.5, vol: 0.12, ataque: 0.1 });
       soplo(ctx, destino, { filtro: 'highpass', desde: 3000, t0, dur: 0.5, vol: 0.06, ataque: 0.15 });
       break;
+    case 'tramo':
+      // Tramo nuevo: arpegio que sube y una campanita al final (se abre el paisaje).
+      melodia(ctx, destino, t0, [SOL4, DO5, MI5, SOL5], 0.1, 0.9, 0.12);
+      campana(ctx, destino, DO6 * 2, t0 + 0.32, 1, 0.07);
+      soplo(ctx, destino, { filtro: 'highpass', desde: 2500, t0, dur: 0.9, vol: 0.05, ataque: 0.3 });
+      break;
     case 'cuenta':
       tono(ctx, destino, { desde: 660, t0, dur: 0.2, vol: 0.25 });
       break;
@@ -239,8 +246,11 @@ export function tocar(ctx: Contexto, destino: AudioNode, sonido: Sonido, t0: num
   }
 }
 
-/** Fondo de la cueva: un rumor grave que «respira» (ruido marrón filtrado). */
-export function crearAmbienteCueva(ctx: Contexto, destino: AudioNode): () => void {
+/**
+ * Fondo de la cueva: un rumor grave que «respira» (ruido marrón filtrado).
+ * Devuelve cómo pararlo y su filtro: en la grieta se abre (suena más aire).
+ */
+export function crearAmbienteCueva(ctx: Contexto, destino: AudioNode): { parar(): void; filtro: BiquadFilterNode } {
   const segundos = 4;
   const b = ctx.createBuffer(1, ctx.sampleRate * segundos, ctx.sampleRate);
   const d = b.getChannelData(0);
@@ -277,8 +287,11 @@ export function crearAmbienteCueva(ctx: Contexto, destino: AudioNode): () => voi
   fuente.connect(filtro).connect(volumen).connect(destino);
   fuente.start();
   respiro.start();
-  return () => {
-    fuente.stop();
-    respiro.stop();
+  return {
+    parar() {
+      fuente.stop();
+      respiro.stop();
+    },
+    filtro,
   };
 }

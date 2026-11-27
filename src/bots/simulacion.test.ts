@@ -37,3 +37,24 @@ describe('simulación de la cueva con el escalador del ordenador', () => {
     for (const r of conMurcielagos) expect(r.murio).toBe(false);
   });
 });
+
+describe('simulación de la grieta (tramo 2, de 220 a 440 m)', () => {
+  const grieta = SEMILLAS.map((s) => simularSubida(s, { tramo: 1 }));
+  const cueva = conMurcielagos;
+
+  it('se sale de la cornisa de 220 m y todas se suben enteras, sin morir', () => {
+    for (const r of grieta) {
+      expect(r.llego, `semilla ${r.semilla}`).toBe(true);
+      expect(r.murio).toBe(false);
+    }
+  });
+
+  it('a menos de 14 m/s y con los 3 fragmentos', () => {
+    for (const r of grieta) expect(220 / r.segundos).toBeLessThan(14);
+    expect(media(grieta.map((r) => r.fragmentos))).toBeGreaterThanOrEqual(2.5);
+  });
+
+  it('da un respiro: menos golpes de murciélago que la cueva', () => {
+    expect(media(grieta.map((r) => r.golpes))).toBeLessThan(media(cueva.map((r) => r.golpes)));
+  });
+});
