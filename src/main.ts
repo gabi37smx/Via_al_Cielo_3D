@@ -13,7 +13,8 @@ import { crearAudio } from './sonido/audio.ts';
 import { crearOido, sonidosDelPaso } from './sonido/sucesos.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
-import { REGLAS, generarFragmentos, generarMurcielagos, murcielagosDelTramo, type Jugada } from './reglas/partida.ts';
+import { REGLAS, generarFragmentos, generarFragmentosLadera, generarMurcielagos, murcielagosDelTramo, type Jugada } from './reglas/partida.ts';
+import { BASE_LADERA, CIMA, RADIO_COLINA, TUNEL, aLocal, aMundo, acortarFuera, alturaEnSaliente, alturaSueloLadera, centroSaliente, conCrampones, ejes, generarLadera, limiteMundo, salidaLadera } from './reglas/ladera.ts';
 import { crearCorredor, pasoCorredor, type Corredor } from './reglas/carrera.ts';
 import { crearCarreraEnSala } from './modos/carrera.ts';
 import { crearPantallaCarrera } from './ui/carrera.ts';
@@ -21,7 +22,8 @@ import { crearMenuPausa } from './ui/pausa.ts';
 import { ESCENARIOS, alturaSueloTorre, generarTramo, posicionSaliente, puntoDeSalida, tramoEnAltura } from './reglas/torre.ts';
 import { crearCamaraTerceraPersona, giroHaciaPared } from './mundo/camara.ts';
 import { crearCueva } from './mundo/cueva.ts';
-import { crearEscena, mezclaEscenario } from './mundo/escena.ts';
+import { crearEscena, mezclaEscenario, mezclaExterior } from './mundo/escena.ts';
+import { crearMontana } from './mundo/montana.ts';
 import { crearEstalactitas, crearGrieta } from './mundo/grieta.ts';
 import { crearAdornos } from './mundo/adornos.ts';
 import { crearFragmentos, crearMurcielagos } from './mundo/objetos.ts';
@@ -97,40 +99,70 @@ const fin = crearPantallaFin(document.querySelector<HTMLElement>('#fin')!, () =>
 entrada.alPulsar('F3', panel.alternar);
 window.addEventListener('resize', mundo.redimensionar);
 
-// El mundo: la cueva (0-220 m) y la grieta (220-440 m), con sus objetos.
-// La carrera acaba en el rellano de la cueva (`tramo`); jugando solo se sigue.
-const tramos = ESCENARIOS.map((_, i) => generarTramo(semilla, i));
+// El mundo: la cueva (0-220 m), la grieta (220-440 m) y, saliendo por el
+// pasillo, la ladera de la montaña (440-660 m). La carrera acaba en el
+// rellano de la cueva (`tramo`); jugando solo se sigue.
+const tramos = [0, 1].map((i) => generarTramo(semilla, i));
 const tramo = tramos[0]!;
-const suelo = (x: number, z: number, techo: number) => alturaSueloTorre(tramos, x, z, techo);
+const ladera = generarLadera(semilla);
+const suelo = (x: number, z: number, techo: number) => Math.max(alturaSueloTorre(tramos, x, z, techo), alturaSueloLadera(ladera, x, z, techo));
+/** Por dónde no se puede pasar: la pared del pozo, el pasillo, la colina y la montaña. */
+const limite = limiteMundo(ladera);
 const peligros = {
-  fragmentos: tramos.flatMap((t) => generarFragmentos(semilla, t)),
+  fragmentos: [...tramos.flatMap((t) => generarFragmentos(semilla, t)), ...generarFragmentosLadera(semilla, ladera)],
   murcielagos: tramos.flatMap((t) => generarMurcielagos(semilla, t, murcielagosDelTramo(t.indice))),
 };
+const ejesLadera = ejes(ladera);
+/** Fuera, la cámara va detrás del escalador, mirando a la montaña (hacia +N). */
+const giroFuera = Math.atan2(-ejesLadera.nx, -ejesLadera.nz);
+/** ¿Está en el pasillo o fuera? (ahí la cámara mira a la montaña, no a la pared del pozo) */
+function fuera(x: number, z: number, y: number): boolean {
+  if (y < BASE_LADERA - 1) return false;
+  const { d, u } = aLocal(ladera, x, z);
+  return Math.hypot(x, z) > RADIO_COLINA - 1 || (d > 11 && Math.abs(u) < TUNEL.ancho);
+}
+mundo.orientarSol(ejesLadera.nx, ejesLadera.nz);
 // Lo que se pisa siempre es más claro que la pared, para verlo de un vistazo.
 const roca = crearTexturaRoca({ oscuro: '#2b2620', claro: '#8c7f6c' });
 const piedra = crearTexturaRoca({ oscuro: '#6b6356', claro: '#d9cdb4', semilla: 7, relieve: 4 });
 const rocaGrieta = crearTexturaRoca({ oscuro: '#8c7b66', claro: '#cdbda5', semilla: 11 });
 const piedraGrieta = crearTexturaRoca({ oscuro: '#7d7a72', claro: '#efebe2', semilla: 13, relieve: 4 });
+const montana = {
+  roca: crearTexturaRoca({ oscuro: '#7b848f', claro: '#cfd6de', semilla: 17 }),
+  nieve: crearTexturaRoca({ oscuro: '#d5dee8', claro: '#ffffff', semilla: 19, relieve: 1 }),
+  piedra: crearTexturaRoca({ oscuro: '#b9c2cc', claro: '#f7f9fb', semilla: 23, relieve: 3 }),
+};
 const fragmentos = crearFragmentos(peligros.fragmentos);
 const murcielagos = crearMurcielagos(peligros.murcielagos);
 mundo.escena.add(
   crearCueva(roca, tramo),
   crearTorre(tramo, piedra),
   crearEstalactitas(tramo, 0x5a5146, 2201), // el techo de la cueva
-  crearGrieta(rocaGrieta, tramos[1]!),
+  crearGrieta(rocaGrieta, tramos[1]!, { angulo: ladera.angulo, ancho: TUNEL.ancho + 0.2, desde: BASE_LADERA - 0.5, hasta: BASE_LADERA + TUNEL.alto }),
   crearTorre(tramos[1]!, piedraGrieta),
   // Fósiles, esqueletos, cráneos, cofres… (solo se ven: no se pisan).
   crearAdornos(tramo, { semilla: 5101, dinosaurios: 3, personas: 5, amonites: 0, craneos: 14, delSuelo: true, hueso: 0xd8cdb0 }),
   crearAdornos(tramos[1]!, { semilla: 5102, dinosaurios: 1, personas: 2, amonites: 10, craneos: 8, delSuelo: false, hueso: 0xeae2cf }),
+  crearMontana(ladera, montana),
   fragmentos.grupo,
   murcielagos.grupo,
 );
 
-// Dónde empieza: en el suelo antes del primer saliente, o en el saliente pedido con ?altura.
-const todos = tramos.flatMap((t) => t.salientes);
-const inicio = todos.find((s) => s.y >= alturaInicial) ?? todos[0]!;
-const enSuelo = puntoDeSalida(tramo, puesto);
-const salida = alturaInicial > 0 ? { ...posicionSaliente(inicio), y: inicio.y } : { x: enSuelo.x, z: enSuelo.z, y: 0 };
+// Dónde empieza: en el suelo antes del primer saliente, o en el saliente pedido con
+// ?altura (desde 440 m, en la explanada delante del pasillo o en un saliente de la ladera).
+function sitioDeInicio(): { x: number; y: number; z: number } {
+  if (alturaInicial >= BASE_LADERA) {
+    const s = ladera.salientes.find((x) => x.y >= alturaInicial);
+    if (!s || alturaInicial === BASE_LADERA) return { ...salidaLadera(ladera), y: BASE_LADERA };
+    const c = centroSaliente(s);
+    return { ...aMundo(ladera, c.d, c.u), y: alturaEnSaliente(s, c.d) };
+  }
+  const todos = tramos.flatMap((t) => t.salientes);
+  const inicio = todos.find((s) => s.y >= alturaInicial) ?? todos[0]!;
+  const enSuelo = puntoDeSalida(tramo, puesto);
+  return alturaInicial > 0 ? { ...posicionSaliente(inicio), y: inicio.y } : { x: enSuelo.x, z: enSuelo.z, y: 0 };
+}
+const salida = sitioDeInicio();
 
 // El modelo del escalador se descarga (~270 kB): el juego arranca cuando llega.
 // Se cargan los dos: el tuyo y el de los rivales, que pueden ser de otro aspecto.
@@ -139,11 +171,16 @@ const aspecto = elegirAspecto();
 const personaje = crearPersonaje(modelos[aspecto]);
 const sombra = crearSombra();
 mundo.escena.add(personaje.raiz, sombra.mancha);
-// La cámara empieza entre el escalador y el centro del pozo, mirando a la pared.
-const camara = crearCamaraTerceraPersona(mundo.camara, giroHaciaPared(salida.x, salida.z));
+// La cámara empieza entre el escalador y el centro del pozo, mirando a la pared (fuera: a la montaña).
+const empiezaFuera = fuera(salida.x, salida.z, salida.y);
+const camara = crearCamaraTerceraPersona(
+  mundo.camara,
+  empiezaFuera ? giroFuera : giroHaciaPared(salida.x, salida.z),
+  empiezaFuera ? CONFIG.camara.inclinacionFuera : CONFIG.camara.inclinacion,
+);
 
 // 2 · Los rivales de la sala: aparecen y desaparecen según la presencia de Supabase.
-const rivales = crearRivales(mundo.escena, modelos);
+const rivales = crearRivales(mundo.escena, modelos, (x, y, z, antes) => conCrampones(ladera, x, y, z, antes));
 const lista = sala ? crearListaJugadores(document.querySelector<HTMLElement>('#sala')!, sala.codigo) : null;
 if (sala) {
   const s = sala;
@@ -166,6 +203,8 @@ let jugador: Corredor;
 let oido = crearOido();
 /** El tramo más alto al que ha llegado (para avisar al entrar en uno nuevo). */
 let tramoAlcanzado = 0;
+/** Ya ha llegado a la cima (para avisar una vez). */
+let cimaAlcanzada = false;
 const anterior = { x: 0, y: 0, z: 0 };
 
 /** Al principio, al «volver a jugar» (solo) y en cada salida de carrera (con su puesto). */
@@ -173,11 +212,15 @@ function reiniciar(puestoCarrera?: number) {
   jugador = crearCorredor(tramo, puestoCarrera ?? puesto);
   const e = jugador.escalador;
   if (puestoCarrera === undefined) Object.assign(e, salida);
+  // Empezando ya fuera (?altura desde 440 m), con los crampones puestos (sin su clic).
+  e.crampones = conCrampones(ladera, e.x, e.y, e.z, false);
   const angulo = Math.atan2(e.z, e.x);
-  e.orientacion = Math.atan2(Math.cos(angulo), Math.sin(angulo)); // mirando a la pared
+  // Mirando a la pared (fuera, a la montaña).
+  e.orientacion = fuera(e.x, e.z, e.y) ? Math.atan2(ejesLadera.nx, ejesLadera.nz) : Math.atan2(Math.cos(angulo), Math.sin(angulo));
   Object.assign(anterior, { x: e.x, y: e.y, z: e.z });
   jugador.partida.alturaMaxima = e.y;
   tramoAlcanzado = tramoEnAltura(e.y);
+  cimaAlcanzada = e.y >= CIMA - 0.01;
   oido = crearOido();
   fragmentos.mostrarTodos();
 }
@@ -268,7 +311,8 @@ const bucle = crearBucle({
       m.ratonY * CC.sensibilidadRaton + m.girarY * CC.velocidadGiro * paso,
     );
     const e0 = jugador.escalador;
-    camara.recolocar(e0.x, e0.z, paso);
+    const afuera = fuera(e0.x, e0.z, e0.y);
+    camara.recolocar(e0.x, e0.z, paso, afuera ? giroFuera : undefined, afuera ? CC.inclinacionFuera : undefined);
     anterior.x = e0.x;
     anterior.y = e0.y;
     anterior.z = e0.z;
@@ -281,7 +325,7 @@ const bucle = crearBucle({
       ? { ...QUIETO, giroCamara: camara.giro }
       : { moverX: m.moverX, moverY: m.moverY, saltar: m.saltar, giroCamara: camara.giro };
     const tiempo = carrera ? carrera.estado.tiempo : jugador.partida.tiempo;
-    const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso);
+    const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso, limite, ladera);
     if (r.sucesos.aterrizaje > 0.5) personaje.aterrizar(r.sucesos.aterrizaje / 6);
     if (r.reaparecio) Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
     recordEnEstePaso = false;
@@ -296,6 +340,12 @@ const bucle = crearBucle({
       tramoAlcanzado = enTramo;
       hud.avisar(`Tramo ${enTramo + 1} · ${ESCENARIOS[enTramo]}`, 'bueno');
       audio.sonar('tramo');
+    }
+    // Y en lo alto de la montaña, la cima (de momento, el final).
+    if (!carrera && !cimaAlcanzada && jugador.escalador.enSuelo && jugador.escalador.y >= CIMA - 0.01) {
+      cimaAlcanzada = true;
+      hud.avisar(`¡Cima! ${CIMA} m`, 'bueno');
+      audio.sonar('victoria');
     }
 
     // 10 veces por segundo, contar a la sala dónde estoy.
@@ -324,19 +374,21 @@ const bucle = crearBucle({
 
     personaje.colocar(pintado.x, pintado.y, pintado.z, e.orientacion);
     personaje.animar(e.postura, Math.hypot(e.vx, e.vz), progresoPostura(e), dtReal);
+    personaje.ponerCrampones(e.crampones);
     // Parpadea mientras es invulnerable; esperando a reaparecer, no se ve.
     personaje.raiz.visible =
       jugador.reaparecerEn === 0 && (partida.invulnerable === 0 || Math.floor(partida.invulnerable * 12) % 2 === 0);
     sombra.colocar(pintado.x, suelo(pintado.x, pintado.z, pintado.y + 0.05), pintado.z, pintado.y);
-    camara.seguir(pintado.x, pintado.y, pintado.z, dtReal);
+    camara.seguir(pintado.x, pintado.y, pintado.z, dtReal, (m, c) => acortarFuera(ladera, m, c));
 
     const t = partida.tiempo + alfa * (1 / 60);
     fragmentos.animar(t);
     murcielagos.actualizar(t);
     rivales.pintar(performance.now(), dtReal);
     const mezcla = mezclaEscenario(pintado.y);
-    mundo.ambientar(mezcla);
-    audio.actualizar(dtReal, mezcla);
+    const exterior = mezclaExterior(aLocal(ladera, pintado.x, pintado.z).d, pintado.y, BASE_LADERA);
+    mundo.ambientar(mezcla, exterior);
+    audio.actualizar(dtReal, mezcla, exterior);
     if (sala && lista && carrera) {
       carrera.pintar(alfa, dtReal, jugador, e.y);
       const alturas = new Map([...rivales.alturas(), ...carrera.alturasDelOrdenador(), [sala.yo.id, e.y]]);
@@ -385,6 +437,12 @@ Object.assign(window, {
     /** Gira la cámara (rad): para las capturas, p. ej. mirar hacia arriba con `juego.girarCamara(0, -0.5)`. */
     girarCamara(giro: number, inclinacion: number) {
       camara.girar(giro, inclinacion);
+    },
+    /** Pone al escalador dentro de la grieta, a 440 m, delante de la entrada del pasillo (para probar la salida). */
+    irAlPasillo() {
+      const p = aMundo(ladera, 9.5, 0);
+      Object.assign(jugador.escalador, { x: p.x, y: BASE_LADERA + 0.5, z: p.z, vx: 0, vy: 0, vz: 0, enSuelo: false });
+      Object.assign(anterior, { x: p.x, y: BASE_LADERA + 0.5, z: p.z });
     },
     /** Sonido: si el navegador ya lo deja sonar («running») y si está silenciado. */
     get sonido() {

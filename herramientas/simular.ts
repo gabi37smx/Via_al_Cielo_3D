@@ -4,6 +4,7 @@
  *   npm run simular                    20 torres de la cueva (tramo 1) con sus murciélagos
  *   npm run simular -- 50 20           50 torres con 20 murciélagos
  *   npm run simular -- 20 - 2          20 torres de la grieta (tramo 2) con sus murciélagos
+ *   npm run simular -- 20 - 3          20 laderas de la montaña (tramo 3)
  *
  * Node 24 ejecuta TypeScript directamente (quita los tipos al cargar).
  */

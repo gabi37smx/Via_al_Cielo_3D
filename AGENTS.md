@@ -21,9 +21,9 @@ src/
   config.ts  TODOS los números que se ajustan jugando (velocidades, saltos, cámara…)
   nucleo/    bucle de paso fijo, entrada (teclado/ratón/mando → una misma estructura)
   jugador/   control.ts (movimiento, LÓGICA PURA) y personaje.ts (dibujo y animación)
-  reglas/    torre, partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
+  reglas/    torre (el pozo), ladera (la montaña y el límite del mundo), partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
   bots/      cerebro del escalador del ordenador y simulación de partidas (lógica pura)
-  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts, grieta.ts y adornos.ts (Three.js)
+  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts, grieta.ts, adornos.ts y montana.ts (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
   red/       protocolo.ts e interpolacion.ts (LÓGICA PURA) y sala.ts (Supabase)
   sonido/    sucesos.ts (qué suena en cada paso, LÓGICA PURA), sintetizador.ts (cómo suena, Web Audio) y audio.ts (volumen, M, fondo)
@@ -48,17 +48,17 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm test` | Pasar las pruebas |
 | `npm run build` | Comprobar tipos y generar `dist/` para publicar |
 | `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms), `--ruta` (por defecto `"?semilla=1&panel=1"`) y `--teclas` (pulsar antes de capturar: `"Space:60,_:400,Space:60"` = doble salto; `_` espera) |
-| `npm run simular` | Simula subidas de la cueva con el escalador del ordenador y enseña una tabla (`npm run simular -- 50 20`: 50 torres, 20 murciélagos; `npm run simular -- 20 - 2`: la grieta, tramo 2, con sus murciélagos). **Después de tocar números de `config.ts` o `REGLAS`, simula** |
+| `npm run simular` | Simula subidas de la cueva con el escalador del ordenador y enseña una tabla (`npm run simular -- 50 20`: 50 torres, 20 murciélagos; `npm run simular -- 20 - 2`: la grieta, tramo 2, con sus murciélagos; `-- 20 - 3`: la ladera de la montaña). **Después de tocar números de `config.ts` o `REGLAS`, simula** |
 | `npm run prueba-red` | **Prueba con dos navegadores** contra Supabase (Ana con la escaladora y Beto con el escalador): se ven, misma semilla, anfitrión, cada uno ve al otro con su aspecto, posición del rival, **una carrera entera** (salida, llegadas, fin y ganador) y relevo del anfitrión. Tarda ~2 minutos. Deja `capturas/red-ana.png`, `capturas/red-beto.png` y `capturas/red-carrera.png`. Necesita el `.env` |
 | `npm run sonidos` | Graba cada sonido del juego en `capturas/sonidos/*.wav` (con el mismo código del juego) y enseña su duración, pico y volumen. Falla si alguno sale mudo, saturado o cortado. **Después de tocar `src/sonido/sintetizador.ts`, pásalo** (la IA no puede oír: lo mide) |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |
 
 Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (empieza en el primer saliente desde esa altura), `?aspecto=escaladora` (o `escalador`; sin él, el último elegido en el menú), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla, altura y postura).
 
-- En la consola del navegador (y en la captura con `--js "…"`) está `juego`: `juego.partida`, `juego.escalador`, `juego.sonido` (`running` = ya suena; antes del primer clic o tecla es `sin crear`), `juego.girarCamara(giro, inclinacion)` (rad, para capturas), `juego.danar(50)`, `juego.teletransportar(x, y, z)`, `juego.red`, `juego.carrera` y `juego.empezarCarrera()` (el anfitrión).
+- En la consola del navegador (y en la captura con `--js "…"`) está `juego`: `juego.partida`, `juego.escalador`, `juego.sonido` (`running` = ya suena; antes del primer clic o tecla es `sin crear`), `juego.girarCamara(giro, inclinacion)` (rad, para capturas), `juego.irAlPasillo()` (dentro de la grieta, delante del pasillo de salida), `juego.danar(50)`, `juego.teletransportar(x, y, z)`, `juego.red`, `juego.carrera` y `juego.empezarCarrera()` (el anfitrión).
 - Con `?sala=` la captura se da por lista en cuanto sale «Conectando…»: para pulsar algo en la sala de espera, espera antes (`--teclas "_:5000,Enter:60"`).
 - Las pulsaciones (saltar) solo valen en el paso en que se leen; los números van a `src/config.ts`, nunca sueltos por el código.
-- SwiftShader (la captura) va a 5-10 fps: el juego va «a cámara lenta» porque el bucle no recupera más de 5 pasos por fotograma. No sirve para medir rendimiento. Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png` (la grieta empieza en `altura=220`).
+- SwiftShader (la captura) va a 5-10 fps: el juego va «a cámara lenta» porque el bucle no recupera más de 5 pasos por fotograma. No sirve para medir rendimiento. Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png` (la grieta empieza en `altura=220`; con `altura=440` se empieza en la explanada de la montaña, a la salida del pasillo).
 - La cámara del juego no mira mucho hacia arriba. Para ver un escenario desde el centro del pozo sirve una página temporal en la raíz servida por Vite (escena + `crearGrieta`/`crearCueva` + cámara colocada a mano) y una captura con Playwright; **se borra después**.
 
 **Después de cada cambio visible, haz una captura y mírala** antes de decir que está hecho. Si la captura avisa de errores en la consola, arréglalos primero.

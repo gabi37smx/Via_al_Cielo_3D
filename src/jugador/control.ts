@@ -6,11 +6,14 @@
  * - Movimiento relativo a la cámara: «adelante» es siempre hacia donde mira.
  * - Aceleración y frenado: no arranca ni para en seco.
  * - Salto, doble salto, tiempo coyote y salto guardado (buffer).
- * - No puede meterse en la pared del pozo: se desliza por ella.
+ * - No puede meterse en la roca (la pared del pozo, o en la ladera el
+ *   pasillo, la colina y la montaña: `Limite`): se desliza por ella.
  * - Se agarra al borde de un saliente si se queda corto y trepa (idea I3).
+ * - En una cuesta de hielo (los salientes de la montaña, decisión 041) se
+ *   desliza cuesta abajo, hacia la pared; con crampones, menos.
  */
 import { CONFIG } from '../config.ts';
-import { RADIO_PARED } from '../reglas/torre.ts';
+import { limitePozo, type Limite } from '../reglas/ladera.ts';
 
 const C = CONFIG.escalador;
 export const VELOCIDAD_SALTO = Math.sqrt(2 * C.gravedad * C.alturaSalto);
@@ -72,6 +75,8 @@ export interface Escalador {
   trepar: number;
   /** Tiempo que le queda sin poder agarrarse (justo después de soltarse). */
   sinAgarre: number;
+  /** Lleva los crampones puestos (los pone reglas/ladera.ts al salir a la nieve). */
+  crampones: boolean;
   postura: Postura;
 }
 
@@ -98,6 +103,7 @@ export function crearEscalador(x: number, y: number, z: number): Escalador {
     agarre: null,
     trepar: 0,
     sinAgarre: 0,
+    crampones: false,
     postura: 'quieto',
   };
 }
@@ -108,7 +114,7 @@ function acercar(actual: number, objetivo: number, max: number): number {
   return Math.abs(d) <= max ? objetivo : actual + Math.sign(d) * max;
 }
 
-export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: number): Sucesos {
+export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: number, limite: Limite = limitePozo): Sucesos {
   const sucesos: Sucesos = { salto: false, dobleSalto: false, aterrizaje: 0, agarre: false };
 
   // 1 · Dirección deseada, relativa a la cámara. La cámara está en
@@ -131,12 +137,15 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   }
   e.sinAgarre = Math.max(e.sinAgarre - paso, 0);
 
-  // 2 · Velocidad horizontal: acelera hacia la deseada, frena al soltar.
+  // 2 · Velocidad horizontal: acelera hacia la deseada, frena al soltar. En
+  //     una cuesta de hielo, la deseada lleva además el deslizamiento.
   const quiere = largo > 0.01;
   const control = e.enSuelo ? 1 : C.controlAire;
   const cambio = (quiere ? C.aceleracion : C.frenado) * control * paso;
-  const objetivoX = dx * C.velocidad;
-  const objetivoZ = dz * C.velocidad;
+  const deriva = e.enSuelo ? deslizamiento(e, suelo) : { x: 0, z: 0 };
+  const deslizando = !quiere && Math.hypot(deriva.x, deriva.z) > 0.01;
+  const objetivoX = dx * C.velocidad + deriva.x;
+  const objetivoZ = dz * C.velocidad + deriva.z;
   // Se acerca como vector (no eje a eje) para que la diagonal frene igual.
   const ddx = objetivoX - e.vx;
   const ddz = objetivoZ - e.vz;
@@ -150,7 +159,8 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   }
 
   // 3 · Girarse hacia donde va.
-  const rapidez = Math.hypot(e.vx, e.vz);
+  //     Deslizándose sin pulsar nada no se gira: resbala tal como está.
+  const rapidez = deslizando ? 0 : Math.hypot(e.vx, e.vz);
   if (rapidez > 0.5) {
     const deseada = Math.atan2(e.vx, e.vz);
     let giro = deseada - e.orientacion;
@@ -185,31 +195,28 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   // 5 · Gravedad.
   e.vy = Math.max(e.vy - C.gravedad * paso, -C.velocidadMaxCaida);
 
-  // 6 · Moverse en horizontal sin meterse en la pared del pozo.
+  // 6 · Moverse en horizontal sin meterse en la roca.
   e.x += e.vx * paso;
   e.z += e.vz * paso;
-  const r = Math.hypot(e.x, e.z);
-  const rMax = RADIO_PARED - C.radio;
-  if (r > rMax) {
-    const nx = e.x / r;
-    const nz = e.z / r;
-    e.x = nx * rMax;
-    e.z = nz * rMax;
-    // Quitar la parte de la velocidad que empuja contra la pared (se desliza).
-    const contra = e.vx * nx + e.vz * nz;
+  const choque = limite(e, e.y);
+  if (choque) {
+    // Quitar la parte de la velocidad que empuja contra la roca (se desliza).
+    const contra = e.vx * choque.nx + e.vz * choque.nz;
     if (contra > 0) {
-      e.vx -= contra * nx;
-      e.vz -= contra * nz;
+      e.vx -= contra * choque.nx;
+      e.vz -= contra * choque.nz;
     }
   }
 
   // 7 · Moverse en vertical. Al bajar, el suelo que cuenta es el que estaba
   //     por debajo de los pies ANTES de moverse: así no se cuela ni cayendo rápido.
+  //     Bajando una cuesta se queda pegado al suelo (si no, iría a saltitos).
   const yAntes = e.y;
   const yNueva = e.y + e.vy * paso;
   if (e.vy <= 0) {
     const s = suelo(e.x, e.z, e.y + 0.05);
-    if (yNueva <= s) {
+    const pegado = e.enSuelo && e.y - s <= C.pegarseAlSuelo;
+    if (yNueva <= s || pegado) {
       if (!e.enSuelo) sucesos.aterrizaje = Math.max(e.alturaMaxima - s, 0);
       e.y = s;
       e.vy = 0;
@@ -228,7 +235,7 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   if (!e.enSuelo) e.alturaMaxima = Math.max(e.alturaMaxima, e.y);
 
   // 8 · ¿Se queda corto? Agarrarse al borde que tenga delante.
-  if (!e.enSuelo && intentarAgarre(e, yAntes, suelo)) {
+  if (!e.enSuelo && intentarAgarre(e, yAntes, suelo, limite)) {
     sucesos.agarre = true;
     return sucesos;
   }
@@ -239,6 +246,36 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
     : e.voltereta > 0 ? 'dobleSalto' : e.vy > 0 ? 'subiendo' : 'cayendo';
 
   return sucesos;
+}
+
+/**
+ * Cuesta del suelo bajo los pies (m de subida por m, en x y en z): se mira el
+ * suelo a 10 cm a cada lado. Un escalón (más de 45°) no es cuesta: si un lado
+ * cae fuera del saliente, se usa solo el otro.
+ */
+export function cuesta(suelo: Suelo, x: number, z: number, y: number): { x: number; z: number } {
+  const E = 0.1;
+  const techo = y + 0.05 + E;
+  const h = suelo(x, z, techo);
+  if (!Number.isFinite(h)) return { x: 0, z: 0 };
+  const vale = (v: number) => Number.isFinite(v) && Math.abs(v - h) < E;
+  const eje = (mas: number, menos: number) => {
+    if (vale(mas) && vale(menos)) return (mas - menos) / (2 * E);
+    if (vale(mas)) return (mas - h) / E;
+    if (vale(menos)) return (h - menos) / E;
+    return 0;
+  };
+  return {
+    x: eje(suelo(x + E, z, techo), suelo(x - E, z, techo)),
+    z: eje(suelo(x, z + E, techo), suelo(x, z - E, techo)),
+  };
+}
+
+/** Velocidad a la que le lleva el hielo cuesta abajo (m/s, en x y en z). Las únicas cuestas son de hielo. */
+function deslizamiento(e: Escalador, suelo: Suelo): { x: number; z: number } {
+  const c = cuesta(suelo, e.x, e.z, e.y);
+  const f = C.deslizarHielo * (e.crampones ? C.deslizarConCrampones : 1);
+  return { x: -c.x * f, z: -c.z * f };
 }
 
 /** Curva suave de 0 a 1 (arranca y llega despacio). */
@@ -254,7 +291,7 @@ function suave(t: number): number {
  * primer trocito con un saliente a la altura de las manos. Si ya hay saliente
  * por detrás del cuerpo es que está DEBAJO de él, no en su borde: nada.
  */
-function intentarAgarre(e: Escalador, yAntes: number, suelo: Suelo): boolean {
+function intentarAgarre(e: Escalador, yAntes: number, suelo: Suelo, limite: Limite): boolean {
   if (e.sinAgarre > 0 || e.vy > C.agarreSubiendo || e.vy < -C.agarreCayendo) return false;
 
   const rapidez = Math.hypot(e.vx, e.vz);
@@ -286,16 +323,12 @@ function intentarAgarre(e: Escalador, yAntes: number, suelo: Suelo): boolean {
         break;
       }
     }
-    // Colgado, con el cuerpo justo delante del borde y dentro del pozo.
-    let colgadoX = bordeX - dx * C.radio;
-    let colgadoZ = bordeZ - dz * C.radio;
-    const r = Math.hypot(colgadoX, colgadoZ);
-    const rMax = RADIO_PARED - C.radio;
-    if (r > rMax) {
-      colgadoX *= rMax / r;
-      colgadoZ *= rMax / r;
-    }
+    // Colgado, con el cuerpo justo delante del borde y fuera de la roca.
     const colgadoY = h - C.alturaManos;
+    const colgado = { x: bordeX - dx * C.radio, z: bordeZ - dz * C.radio };
+    limite(colgado, colgadoY);
+    const colgadoX = colgado.x;
+    const colgadoZ = colgado.z;
     e.agarre = { y: h, dx, dz, colgadoX, colgadoY, colgadoZ, arribaX, arribaZ };
     e.x = colgadoX;
     e.y = colgadoY;

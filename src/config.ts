@@ -28,6 +28,17 @@ export const CONFIG = {
     /** Duración de la voltereta del doble salto (s). */
     voltereta: 0.45,
     /*
+     * El hielo de los salientes de la montaña (decisión 041): su cara de
+     * arriba baja un poco hacia la pared y quien está encima se desliza hacia
+     * ella. Velocidad por cada metro de bajada por metro: con la cuesta de
+     * 0,12 de reglas/ladera.ts son ~2,6 m/s sin crampones y ~1 m/s con ellos.
+     */
+    deslizarHielo: 22,
+    /** Con crampones se desliza solo esta parte. */
+    deslizarConCrampones: 0.4,
+    /** Bajando una cuesta se queda pegado al suelo si está a menos de esto por debajo (m). */
+    pegarseAlSuelo: 0.12,
+    /*
      * Agarrarse al borde y trepar (idea I3). Si en el aire el borde de un
      * saliente queda delante y a la altura de las manos, se agarra.
      */
@@ -73,6 +84,8 @@ export const CONFIG = {
      */
     recolocar: 1.5,
     esperaRecolocar: 1.2,
+    /** Fuera (la ladera), la cámara mira más de frente para ver la montaña y el cielo (rad). */
+    inclinacionFuera: 0.08,
   },
   sonido: {
     /** Volumen general (0-1) y del fondo de la cueva respecto a los efectos. */
@@ -85,6 +98,7 @@ export const CONFIG = {
     /** Hasta qué frecuencia (Hz) se oye el rumor de fondo: grave en la cueva, más abierto en la grieta. */
     filtroCueva: 220,
     filtroGrieta: 480,
+    filtroExterior: 1300,
     /** Con la pausa abierta (solo) el volumen baja a esta fracción. */
     enPausa: 0.25,
     /** Por debajo de esta caída (m) el aterrizaje no suena: es bajar un escalón. */

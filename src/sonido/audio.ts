@@ -79,17 +79,20 @@ export function crearAudio() {
     },
     /**
      * En cada fotograma: de vez en cuando cae una gota. `grieta` (0-1): en la
-     * grieta el rumor suena más abierto y caen la mitad de gotas.
+     * grieta el rumor suena más abierto y caen la mitad de gotas. `exterior`
+     * (0-1): fuera no hay gotas y el rumor suena a viento.
      */
-    actualizar(dt: number, grieta = 0) {
-      const filtro = S.filtroCueva + (S.filtroGrieta - S.filtroCueva) * grieta;
+    actualizar(dt: number, grieta = 0, exterior = 0) {
+      // Fuera, el rumor se abre del todo: suena a viento.
+      const enCueva = S.filtroCueva + (S.filtroGrieta - S.filtroCueva) * grieta;
+      const filtro = enCueva + (S.filtroExterior - enCueva) * exterior;
       // Solo cuando cambia de verdad: cada orden se queda apuntada en el AudioContext.
       if (ctx && ambiente && Math.abs(filtro - ultimoFiltro) > 2) {
         ultimoFiltro = filtro;
         ambiente.filtro.frequency.setTargetAtTime(filtro, ctx.currentTime, 0.5);
       }
       if (!ambienteQuerido || enPausa) return;
-      const gotas = S.gotasPorSegundo * (1 - grieta * 0.5);
+      const gotas = S.gotasPorSegundo * (1 - grieta * 0.5) * (1 - exterior);
       if (Math.random() < gotas * Math.min(dt, 0.1)) sonar('gota', 0.4 + Math.random() * 0.6);
     },
     /** Pausa (solo): baja el volumen y no caen gotas. */

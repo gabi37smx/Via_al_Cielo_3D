@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config.ts';
 import { PASO } from '../nucleo/bucle.ts';
 import { RADIO_PARED, TIPOS } from '../reglas/torre.ts';
-import { crearEscalador, pasoEscalador, type Escalador, type Ordenes, type Suelo } from './control.ts';
+import { crearEscalador, cuesta, pasoEscalador, type Escalador, type Ordenes, type Suelo } from './control.ts';
 
 const C = CONFIG.escalador;
 const QUIETO: Ordenes = { moverX: 0, moverY: 0, saltar: false, giroCamara: 0 };
@@ -237,5 +237,63 @@ describe('agarrarse al borde y trepar (idea I3)', () => {
   it('al agarrarse se corta la caída: luego no cuenta como caída larga', () => {
     const e = saltarJuntoAlBorde();
     expect(e.alturaMaxima).toBeCloseTo(e.y, 9);
+  });
+});
+
+describe('cuestas de hielo (decisión 041)', () => {
+  /** Una cuña de hielo: baja 0,12 m por metro hacia +x; acaba en una pared en x = 3. */
+  const PARED = 3;
+  const CUNA: Suelo = (x, _z, techo) => {
+    if (x < -3) return -Infinity;
+    const h = (PARED - x) * 0.12;
+    return h <= techo ? h : -Infinity;
+  };
+  const conPared = (p: { x: number; z: number }) => {
+    if (p.x <= PARED - C.radio) return null;
+    p.x = PARED - C.radio;
+    return { nx: 1, nz: 0 };
+  };
+  const enCuna = (x: number) => crearEscalador(x, (PARED - x) * 0.12, 0);
+  const quieto = (e: Escalador, n: number, o: Ordenes = QUIETO) => {
+    for (let i = 0; i < n; i++) pasoEscalador(e, o, CUNA, PASO, conPared);
+  };
+
+  it('la cuesta se mide a los lados de los pies; un escalón no cuenta como cuesta', () => {
+    expect(cuesta(CUNA, 0, 0, 0.36).x).toBeCloseTo(-0.12);
+    expect(cuesta(CUNA, 0, 0, 0.36).z).toBeCloseTo(0);
+    expect(cuesta(PLANO, 0, 0, 0)).toEqual({ x: 0, z: 0 });
+    // Al lado del borde (x = −3) se usa solo el lado de dentro.
+    expect(cuesta(CUNA, -2.95, 0, (PARED + 2.95) * 0.12).x).toBeCloseTo(-0.12);
+  });
+
+  it('quieto encima, se desliza hacia la pared sin despegarse del suelo y se queda allí', () => {
+    const e = enCuna(-1);
+    let despegado = false;
+    for (let i = 0; i < 240; i++) {
+      pasoEscalador(e, QUIETO, CUNA, PASO, conPared);
+      if (!e.enSuelo) despegado = true;
+    }
+    expect(despegado).toBe(false);
+    expect(e.x).toBeCloseTo(PARED - C.radio, 5);
+    expect(e.y).toBeCloseTo(C.radio * 0.12, 5);
+    expect(e.postura).toBe('quieto'); // resbala, no corre
+  });
+
+  it('con crampones se desliza más despacio', () => {
+    const sin = enCuna(-2);
+    const con = enCuna(-2);
+    con.crampones = true;
+    quieto(sin, 30);
+    quieto(con, 30);
+    expect(sin.x - -2).toBeGreaterThan((con.x - -2) * 2);
+    expect(con.x).toBeGreaterThan(-2 + 0.2);
+  });
+
+  it('corriendo hacia fuera (cuesta arriba) sigue pudiendo salir del saliente', () => {
+    const e = enCuna(2);
+    e.crampones = true;
+    // Con la cámara en giro 0, izquierda (moverX = −1) es −x.
+    quieto(e, 60, { ...QUIETO, moverX: -1 });
+    expect(e.x).toBeLessThan(-1);
   });
 });

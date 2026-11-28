@@ -11,6 +11,7 @@
 import type { Escalador, Ordenes } from '../jugador/control.ts';
 import { PASO } from '../nucleo/bucle.ts';
 import type { Azar } from '../reglas/azar.ts';
+import { ANCHO_CIMA, aLocal, aMundo, dCara, type Ladera } from '../reglas/ladera.ts';
 import { RADIO_CAMINO, RADIO_PARED, puntoEnAngulo, type Tramo } from '../reglas/torre.ts';
 
 /** Distancia horizontal (m) a la que salta hacia el siguiente saliente. */
@@ -43,6 +44,23 @@ export function siguienteObjetivo(e: Escalador, tramo: Tramo, apoyo: number): Ob
   return { ...puntoEnAngulo(Math.atan2(e.z, e.x), RADIO_PARED - 1), y: tramo.rellano };
 }
 
+/** Lo mismo en la ladera: el punto más cercano del siguiente saliente, o la cima. */
+export function siguienteObjetivoLadera(e: Escalador, l: Ladera, apoyo: number): Objetivo {
+  const yo = aLocal(l, e.x, e.z);
+  const s = l.salientes.find((x) => x.y > apoyo + 0.3);
+  if (s) {
+    const margen = Math.min(0.6, s.ancho / 2 - 0.1);
+    const u = Math.min(Math.max(yo.u, s.u - s.ancho / 2 + margen), s.u + s.ancho / 2 - margen);
+    return { ...aMundo(l, dCara(s.y) - Math.min(0.9, s.fondo - 0.4), u), y: s.y };
+  }
+  const u = Math.min(Math.max(yo.u, -ANCHO_CIMA / 2 + 1), ANCHO_CIMA / 2 - 1);
+  // Justo pasado el borde: desde la pared del último saliente queda a menos de DISTANCIA_SALTO.
+  return { ...aMundo(l, dCara(l.rellano) + 0.5, u), y: l.rellano };
+}
+
+/** Dónde ir a continuación (según dónde está y el último sitio pisado). */
+export type Rumbo = (e: Escalador, apoyo: number) => Objetivo;
+
 export interface Cerebro {
   /** Las órdenes de este paso (`paso` = lo que dura el paso, para las pausas). */
   pensar(e: Escalador, paso?: number): Ordenes;
@@ -61,8 +79,10 @@ export interface OpcionesCerebro {
 
 const QUIETO: Ordenes = { moverX: 0, moverY: 0, saltar: false, giroCamara: 0 };
 
-export function crearCerebro(tramo: Tramo, opciones: OpcionesCerebro = {}): Cerebro {
+/** `donde`: un tramo del pozo, o directamente cómo elegir el siguiente sitio (p. ej. en la ladera). */
+export function crearCerebro(donde: Tramo | Rumbo, opciones: OpcionesCerebro = {}): Cerebro {
   const { pausaMax = 0, azar } = opciones;
+  const rumbo: Rumbo = typeof donde === 'function' ? donde : (e, apoyo) => siguienteObjetivo(e, donde, apoyo);
   let apoyo = -Infinity;
   let espera = 0;
   return {
@@ -76,7 +96,7 @@ export function crearCerebro(tramo: Tramo, opciones: OpcionesCerebro = {}): Cere
         espera -= paso;
         return QUIETO;
       }
-      return decidir(e, siguienteObjetivo(e, tramo, apoyo));
+      return decidir(e, rumbo(e, apoyo));
     },
   };
 }
@@ -93,7 +113,10 @@ function decidir(e: Escalador, o: Objetivo): Ordenes {
   const moverY = d > 0.05 ? (-dz / d) * fuerza : 0;
 
   let saltar = false;
-  if (e.enSuelo) {
+  if (e.postura === 'colgado') {
+    // Colgado de un borde: trepar siempre (subir nunca es ir hacia atrás).
+    saltar = true;
+  } else if (e.enSuelo) {
     saltar = d < DISTANCIA_SALTO;
   } else if (e.saltosAereos > 0 && e.vy < 0 && e.y < o.y) {
     // Se queda corto: doble salto. Aunque ya esté justo debajo (d ≈ 0): en

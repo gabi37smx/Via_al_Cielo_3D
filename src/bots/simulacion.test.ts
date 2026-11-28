@@ -58,3 +58,19 @@ describe('simulación de la grieta (tramo 2, de 220 a 440 m)', () => {
     expect(media(grieta.map((r) => r.golpes))).toBeLessThan(media(cueva.map((r) => r.golpes)));
   });
 });
+
+describe('simulación de la ladera (tramo 3, de 440 a 660 m)', () => {
+  const ladera = SEMILLAS.map((s) => simularSubida(s, { tramo: 2 }));
+
+  it('del pasillo a la cima: todas las laderas se suben enteras', () => {
+    for (const r of ladera) expect(r.llego, `semilla ${r.semilla}`).toBe(true);
+  });
+
+  it('a menos de 14 m/s, entre 40 s y 2,5 min, y con los 3 fragmentos', () => {
+    for (const r of ladera) expect(220 / r.segundos).toBeLessThan(14);
+    const t = media(ladera.map((r) => r.segundos));
+    expect(t).toBeGreaterThan(40);
+    expect(t).toBeLessThan(150);
+    expect(media(ladera.map((r) => r.fragmentos))).toBeGreaterThanOrEqual(2.5);
+  });
+});

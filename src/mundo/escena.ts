@@ -20,6 +20,8 @@ export const AMBIENTES = {
   cueva: { fondo: 0x101724, niebla: 0.028, cielo: 0x8fa3c8, sueloLuz: 0x3a2e22, relleno: 0.9, sol: 0xdfe8ff, intensidadSol: 3.2, linterna: 40 },
   /** Grieta (cueva clara): luz cálida que entra por las rendijas, se ve más lejos. */
   grieta: { fondo: 0x7a6f62, niebla: 0.017, cielo: 0xf4ece0, sueloLuz: 0x6a5b4a, relleno: 1.9, sol: 0xfff2e0, intensidadSol: 3.3, linterna: 12 },
+  /** Aire libre: cielo azul, nieve que refleja luz, niebla muy fina (se ve muy lejos), sin linterna. */
+  exterior: { fondo: 0xcfe3f2, niebla: 0.0032, cielo: 0xcfe8ff, sueloLuz: 0xe6edf4, relleno: 1.5, sol: 0xfff8ec, intensidadSol: 3.4, linterna: 0 },
 } as const satisfies Record<string, Ambiente>;
 
 /** Metros por debajo y por encima del rellano de los 220 m en los que la cueva se convierte en grieta. */
@@ -34,6 +36,17 @@ export function mezclaEscenario(y: number, rellano = 220): number {
   return t * t * (3 - 2 * t);
 }
 
+/**
+ * Cuánto de aire libre hay: 0 en el pozo, 1 fuera. Cambia a lo largo del
+ * pasillo de la ladera (`d` = distancia hacia fuera desde el eje del pozo),
+ * solo a la altura de la ladera (`y` ≥ `base` − 2).
+ */
+export function mezclaExterior(d: number, y: number, base: number, desde = 14, hasta = 24): number {
+  if (y < base - 2) return 0;
+  const t = Math.min(Math.max((d - desde) / (hasta - desde), 0), 1);
+  return t * t * (3 - 2 * t);
+}
+
 /** 1 unidad de Three.js = 1 metro (ver docs/diseno.md). */
 export interface Escena {
   renderer: THREE.WebGLRenderer;
@@ -43,8 +56,10 @@ export interface Escena {
   redimensionar(): void;
   /** Pinta. `foco`: dónde está el escalador (las luces le siguen). */
   pintar(foco: THREE.Vector3Like): void;
-  /** Mezcla la cueva (0) con la grieta (1): fondo, niebla y luces. */
-  ambientar(mezcla: number): void;
+  /** Mezcla la cueva (0) con la grieta (1) y, encima, con el aire libre (`exterior`, 0-1): fondo, niebla y luces. */
+  ambientar(mezcla: number, exterior?: number): void;
+  /** Fuera, el sol viene desde detrás de quien mira a la montaña: (nx, nz) = hacia la montaña. */
+  orientarSol(nx: number, nz: number): void;
 }
 
 export function crearEscena(lienzo: HTMLCanvasElement): Escena {
@@ -64,7 +79,8 @@ export function crearEscena(lienzo: HTMLCanvasElement): Escena {
   escena.fog = niebla;
 
   // 2 · Cámara en perspectiva (la mueve mundo/camara.ts).
-  const camara = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
+  // Hasta 1000 m: fuera se ven las montañas del fondo (en las cuevas, la niebla tapa todo antes).
+  const camara = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
 
   // 3 · Luz de relleno, baja: en una cueva casi todo es sombra. Si es muy
   //     fuerte, tapa las sombras del sol (tropiezo de la sesión 2 del curso).
@@ -91,9 +107,15 @@ export function crearEscena(lienzo: HTMLCanvasElement): Escena {
   const linterna = new THREE.PointLight(0xffb36b, 40, 18, 2);
   escena.add(linterna);
 
+  /** De dónde viene el sol respecto al escalador: en el pozo, fijo; fuera, desde detrás de la cámara. */
+  const solPozo = new THREE.Vector3(16, 24, 12);
+  const solFuera = new THREE.Vector3(16, 24, 12);
+  const solAhora = new THREE.Vector3(16, 24, 12);
+  let exteriorAhora = 0;
   function colocarLuces(f: THREE.Vector3Like) {
     // Inclinado ~45°: si cae vertical solo ilumina las caras de arriba.
-    sol.position.set(f.x + 16, f.y + 24, f.z + 12);
+    solAhora.lerpVectors(solPozo, solFuera, exteriorAhora);
+    sol.position.set(f.x + solAhora.x, f.y + solAhora.y, f.z + solAhora.z);
     sol.target.position.set(f.x, f.y, f.z);
     // Por encima y hacia la cámara, para que ilumine lo que se ve. Justo
     // encima de la cabeza la dejaba quemada de luz.
@@ -120,24 +142,36 @@ export function crearEscena(lienzo: HTMLCanvasElement): Escena {
   const a = new THREE.Color();
   const b = new THREE.Color();
   const mezclar = (desde: number, hasta: number, t: number) => desde + (hasta - desde) * t;
-  let ultimaMezcla = NaN;
-  function ambientar(mezcla: number) {
+  let ultima = '';
+  /** Mezcla dos ambientes (o tres: cueva → grieta → exterior). */
+  function ambientar(mezcla: number, exterior = 0) {
     const t = Math.min(Math.max(mezcla, 0), 1);
-    if (t === ultimaMezcla) return;
-    ultimaMezcla = t;
-    const [c, g] = [AMBIENTES.cueva, AMBIENTES.grieta];
-    fondo.lerpColors(a.setHex(c.fondo), b.setHex(g.fondo), t);
+    const x = Math.min(Math.max(exterior, 0), 1);
+    const clave = `${t}|${x}`;
+    if (clave === ultima) return;
+    ultima = clave;
+    exteriorAhora = x;
+    const [c, g, f] = [AMBIENTES.cueva, AMBIENTES.grieta, AMBIENTES.exterior];
+    const color = (prop: 'fondo' | 'cielo' | 'sueloLuz' | 'sol', destino: THREE.Color) =>
+      destino.lerpColors(a.setHex(c[prop]), b.setHex(g[prop]), t).lerp(b.setHex(f[prop]), x);
+    const numero = (prop: 'niebla' | 'relleno' | 'intensidadSol' | 'linterna') => mezclar(mezclar(c[prop], g[prop], t), f[prop], x);
+    color('fondo', fondo);
     niebla.color.copy(fondo);
-    niebla.density = mezclar(c.niebla, g.niebla, t);
-    relleno.color.lerpColors(a.setHex(c.cielo), b.setHex(g.cielo), t);
-    relleno.groundColor.lerpColors(a.setHex(c.sueloLuz), b.setHex(g.sueloLuz), t);
-    relleno.intensity = mezclar(c.relleno, g.relleno, t);
-    sol.color.lerpColors(a.setHex(c.sol), b.setHex(g.sol), t);
-    sol.intensity = mezclar(c.intensidadSol, g.intensidadSol, t);
-    linterna.intensity = mezclar(c.linterna, g.linterna, t);
+    niebla.density = numero('niebla');
+    color('cielo', relleno.color);
+    color('sueloLuz', relleno.groundColor);
+    relleno.intensity = numero('relleno');
+    color('sol', sol.color);
+    sol.intensity = numero('intensidadSol');
+    linterna.intensity = numero('linterna');
+  }
+
+  function orientarSol(nx: number, nz: number) {
+    // Desde detrás de la cámara (−N), un poco de lado y alto: la cara de la montaña queda iluminada.
+    solFuera.set(-nx * 14 - nz * 9, 26, -nz * 14 + nx * 9);
   }
 
   redimensionar();
   ambientar(0);
-  return { renderer, escena, camara, redimensionar, pintar, ambientar };
+  return { renderer, escena, camara, redimensionar, pintar, ambientar, orientarSol };
 }

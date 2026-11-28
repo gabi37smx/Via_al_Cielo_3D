@@ -18,34 +18,64 @@ import { materialRoca, type TexturaRoca } from './texturas.ts';
 export const RADIO_CUEVA = RADIO_PARED;
 const CRISTALES = 140;
 
+/** Un hueco en la pared (el pasillo de la ladera): alrededor de `angulo`, de `ancho` m, entre dos alturas. */
+export interface HuecoPared {
+  angulo: number;
+  ancho: number;
+  desde: number;
+  hasta: number;
+}
+
 /**
  * Pared de un tramo: un cilindro visto por dentro desde `desde` hasta `hasta`
  * (m). Entre dos tramos la junta queda escondida debajo del rellano.
  * `aclararEn` (m): la pared empieza oscura (como la del tramo de abajo) y se
  * aclara en esos metros; así no se ve una raya donde cambia de escenario.
+ * `hueco`: se parte en tres trozos (debajo, a la altura del hueco y encima) y
+ * la textura se cuadra entre ellos para que no se noten las juntas.
  */
-export function crearPared(roca: TexturaRoca, desde: number, hasta: number, color: THREE.ColorRepresentation, aclararEn = 0): THREE.Mesh {
-  const alto = hasta - desde;
+export function crearPared(
+  roca: TexturaRoca,
+  desde: number,
+  hasta: number,
+  color: THREE.ColorRepresentation,
+  aclararEn = 0,
+  hueco?: HuecoPared,
+): THREE.Object3D {
   // La textura se repite cada 4 m: la pared se ve de cerca al escalar.
   const vueltas = Math.round((2 * Math.PI * RADIO_CUEVA) / 4);
-  const geometria = new THREE.CylinderGeometry(RADIO_CUEVA, RADIO_CUEVA, alto, 64, aclararEn > 0 ? Math.ceil(alto) : 1, true);
-  if (aclararEn > 0) {
-    // Color por vértice: 0,3 abajo → 1 a `aclararEn` m (multiplica al de la textura).
-    const pos = geometria.attributes.position!;
-    const colores = new Float32Array(pos.count * 3);
-    for (let i = 0; i < pos.count; i++) {
-      const t = Math.min((pos.getY(i) + alto / 2) / aclararEn, 1);
-      colores.fill(0.3 + 0.7 * t * t * (3 - 2 * t), i * 3, i * 3 + 3);
+  const trozo = (abajo: number, arriba: number, inicio = 0, largo = Math.PI * 2) => {
+    const alto = arriba - abajo;
+    const geometria = new THREE.CylinderGeometry(RADIO_CUEVA, RADIO_CUEVA, alto, Math.max(Math.round((64 * largo) / (Math.PI * 2)), 4), aclararEn > 0 ? Math.max(Math.ceil(alto), 1) : 1, true, inicio, largo);
+    if (aclararEn > 0) {
+      // Color por vértice: 0,3 abajo → 1 a `aclararEn` m (multiplica al de la textura).
+      const pos = geometria.attributes.position!;
+      const colores = new Float32Array(pos.count * 3);
+      for (let i = 0; i < pos.count; i++) {
+        const t = Math.min((pos.getY(i) + alto / 2 + abajo - desde) / aclararEn, 1);
+        colores.fill(0.3 + 0.7 * t * t * (3 - 2 * t), i * 3, i * 3 + 3);
+      }
+      geometria.setAttribute('color', new THREE.BufferAttribute(colores, 3));
     }
-    geometria.setAttribute('color', new THREE.BufferAttribute(colores, 3));
-  }
-  const pared = new THREE.Mesh(
-    geometria,
-    materialRoca(roca, vueltas, alto / 4, { side: THREE.BackSide, color, vertexColors: aclararEn > 0 }),
+    const material = materialRoca(roca, (vueltas * largo) / (Math.PI * 2), alto / 4, { side: THREE.BackSide, color, vertexColors: aclararEn > 0 });
+    // Cuadrar la textura con la de los otros trozos (misma escala, desplazada).
+    for (const t of [material.map, material.normalMap, material.roughnessMap]) t?.offset.set((vueltas * inicio) / (Math.PI * 2), (abajo - desde) / 4);
+    const malla = new THREE.Mesh(geometria, material);
+    malla.position.y = abajo + alto / 2;
+    malla.receiveShadow = true;
+    return malla;
+  };
+  if (!hueco) return trozo(desde, hasta);
+  const grupo = new THREE.Group();
+  const anchoAngulo = hueco.ancho / RADIO_CUEVA;
+  // En CylinderGeometry el ángulo θ va al revés y empieza en otro sitio: θ = π/2 − ángulo.
+  const centro = Math.PI / 2 - hueco.angulo;
+  grupo.add(
+    trozo(desde, hueco.desde),
+    trozo(hueco.desde, hueco.hasta, centro + anchoAngulo / 2, Math.PI * 2 - anchoAngulo),
+    trozo(hueco.hasta, hasta),
   );
-  pared.position.y = desde + alto / 2;
-  pared.receiveShadow = true;
-  return pared;
+  return grupo;
 }
 
 export interface OpcionesCristales {

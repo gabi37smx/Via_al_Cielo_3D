@@ -20,7 +20,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { crearAzar, entre, type Azar } from '../reglas/azar.ts';
 import { GROSOR_RELLANO, RADIO_PARED, RADIO_RELLANO, sobreSaliente, type Tramo } from '../reglas/torre.ts';
-import { crearCristales, crearPared } from './cueva.ts';
+import { crearCristales, crearPared, type HuecoPared } from './cueva.ts';
 import type { TexturaRoca } from './texturas.ts';
 
 /** Cuántas grietas de luz hay y cada cuántos metros sale un rayo de una grieta. */
@@ -141,6 +141,7 @@ function materialRayo(): THREE.ShaderMaterial {
         float largo = smoothstep(0.0, 0.7, vUv.y);
         float a = fuerza * pow(deFrente, 2.0) * largo;
         gl_FragColor = vec4(color * a, 1.0);
+        #include <colorspace_fragment>
       }`,
     transparent: true,
     blending: THREE.AdditiveBlending,
@@ -275,14 +276,15 @@ export function crearEstalactitas(tramo: Tramo, color: THREE.ColorRepresentation
 
 /* ---------- La grieta entera ---------- */
 
-export function crearGrieta(roca: TexturaRoca, tramo: Tramo): THREE.Group {
+/** `salida`: el hueco del pasillo que sale a la ladera (a la altura del rellano de arriba). */
+export function crearGrieta(roca: TexturaRoca, tramo: Tramo, salida?: HuecoPared): THREE.Group {
   const grupo = new THREE.Group();
   grupo.name = 'grieta';
   const azar = crearAzar(4401);
   const arriba = tramo.rellano + 20;
 
   // Desde justo debajo del rellano de abajo (la junta queda escondida).
-  grupo.add(crearPared(roca, tramo.base - GROSOR_RELLANO, arriba, 0xe2d9cc, 12));
+  grupo.add(crearPared(roca, tramo.base - GROSOR_RELLANO, arriba, 0xe2d9cc, 12, salida));
 
   // Cada grieta: un núcleo fino que brilla y un halo ancho y suave alrededor.
   const angulos = angulosGrietas(azar);
