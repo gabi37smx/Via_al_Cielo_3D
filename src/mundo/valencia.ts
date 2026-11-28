@@ -101,6 +101,82 @@ function texturaTrencadis(): THREE.CanvasTexture {
   return t;
 }
 
+/**
+ * Fachada con ventanas: 4 × 4 casillas (una ventana por planta), la pared
+ * blanca (el color de cada edificio la tiñe) y ventanas distintas: cristal
+ * con reflejo, persiana bajada, alguna con balcón. Cada casilla es 4 m de
+ * ancho y 3,2 m de alto (una planta), así todas las ventanas miden lo mismo.
+ */
+const VENTANA = { ancho: 4, alto: 3.2, casillas: 4 } as const;
+function texturaVentanas(): THREE.CanvasTexture {
+  const C = 64;
+  const lienzo = document.createElement('canvas');
+  lienzo.width = lienzo.height = C * VENTANA.casillas;
+  const ctx = lienzo.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+  const azar = crearAzar(4404);
+  for (let fila = 0; fila < VENTANA.casillas; fila++) {
+    for (let col = 0; col < VENTANA.casillas; col++) {
+      const x = col * C + 14;
+      const y = fila * C + 12;
+      const w = C - 28;
+      const h = C - 26;
+      if (azar() < 0.22) {
+        // Persiana bajada (de lamas, verde o crema).
+        ctx.fillStyle = azar() < 0.5 ? '#7d9a6a' : '#d9c7a0';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        for (let k = 3; k < h; k += 4) ctx.fillRect(x, y + k, w, 1);
+      } else {
+        // Cristal: oscuro abajo, con el cielo reflejado arriba, y el marco del medio.
+        const g = ctx.createLinearGradient(0, y, 0, y + h);
+        g.addColorStop(0, '#8fb2cc');
+        g.addColorStop(1, '#2c3f52');
+        ctx.fillStyle = g;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#e8e8e8';
+        ctx.fillRect(x + w / 2 - 1, y, 2, h);
+      }
+      // Alféizar, y a veces un balcón con barandilla.
+      ctx.fillStyle = '#cfc9bf';
+      ctx.fillRect(x - 3, y + h, w + 6, 3);
+      if (azar() < 0.3) {
+        ctx.fillStyle = '#4a4a4a';
+        ctx.fillRect(x - 5, y + h - 12, w + 10, 2);
+        for (let k = x - 5; k <= x + w + 5; k += 4) ctx.fillRect(k, y + h - 12, 1, 12);
+      }
+    }
+  }
+  const t = new THREE.CanvasTexture(lienzo);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** Cristal con su perfilería: paños con reflejo y los marcos claros (`columnas` × `filas` paños). */
+function texturaCristal(columnas: number, filas: number, base: string, reflejo: string): THREE.CanvasTexture {
+  const tam = 256;
+  const lienzo = document.createElement('canvas');
+  lienzo.width = lienzo.height = tam;
+  const ctx = lienzo.getContext('2d')!;
+  const g = ctx.createLinearGradient(0, 0, tam, tam);
+  g.addColorStop(0, reflejo);
+  g.addColorStop(0.55, base);
+  g.addColorStop(1, reflejo);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, tam, tam);
+  ctx.fillStyle = '#eef1f3';
+  for (let i = 0; i <= columnas; i++) ctx.fillRect((i * tam) / columnas - 2, 0, 4, tam);
+  for (let i = 0; i <= filas; i++) ctx.fillRect(0, (i * tam) / filas - 2, tam, 4);
+  const t = new THREE.CanvasTexture(lienzo);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
 /** La senyera: cuatro barras rojas sobre amarillo y la franja azul con la corona junto al mástil. */
 function texturaSenyera(): THREE.CanvasTexture {
   const lienzo = document.createElement('canvas');
@@ -259,9 +335,12 @@ function crearMuseu(): THREE.Group {
   const cx = (M.x0 + M.x1) / 2;
   // El cuerpo blanco, más bajo por detrás, y la fachada de cristal (mira a la pista: −z).
   const blancas: THREE.BufferGeometry[] = [new THREE.BoxGeometry(largo, ALTO * 0.8, fondo * 0.6).translate(cx, ALTO * 0.4, M.z1 - fondo * 0.3)];
+  // Cristal con su perfilería: paños de 3 × 4 m (la textura trae 4 × 4 paños).
+  const vidrio = texturaCristal(4, 4, '#4f6b80', '#9cb9cc');
+  vidrio.repeat.set((largo - 6) / 12, (ALTO - 4) / 16);
   const cristal = new THREE.Mesh(
     new THREE.BoxGeometry(largo - 6, ALTO - 4, 1).translate(cx, (ALTO - 4) / 2, M.z0 + 7),
-    new THREE.MeshStandardMaterial({ color: 0x8eaabd, roughness: 0.1, metalness: 0.55 }),
+    new THREE.MeshStandardMaterial({ map: vidrio, roughness: 0.15, metalness: 0.2 }),
   );
   // Los «árboles»: columnas blancas que se abren en Y al llegar arriba, delante del cristal.
   const SEPARACION = 12;
@@ -375,9 +454,12 @@ function crearPalau(): THREE.Group {
   // El casco interior: un huevo de cristal azulado; su morro (en el suelo) es el frente.
   // Más bajo que las cáscaras: por fuera manda el blanco y el cristal asoma por delante.
   const rc = radios(P.casco.rx, P.casco.rz, 115);
+  // Paños de unos 5 × 5 m: la esfera da la vuelta (u) y sube (v) con la textura repetida.
+  const cascoCristal = texturaCristal(4, 4, '#b8d0de', '#e6f0f5');
+  cascoCristal.repeat.set(70, 16);
   const casco = new THREE.Mesh(
     new THREE.SphereGeometry(1, 48, 24).scale(rc.rx, rc.ry, rc.rz).translate(P.x, CENTRO_Y, P.z),
-    new THREE.MeshStandardMaterial({ color: 0xd6e7f0, emissive: 0x2a4352, emissiveIntensity: 0.35, roughness: 0.3, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ map: cascoCristal, emissive: 0x2a4352, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0 }),
   );
   // Las cáscaras: trozos de una elipse mayor (arriba, a 220 m), una a cada
   // lado, abiertas por delante (desde `cascaras.desde`) y un poco por detrás.
@@ -462,13 +544,41 @@ function crearSenyera(): { grupo: THREE.Group; ondear(t: number): void } {
 
 /* ---------- La ciudad, el mar y el cielo ---------- */
 
-function crearCiudad(): THREE.InstancedMesh {
+/**
+ * La ciudad alrededor: bloques de pisos de colores cálidos con VENTANAS por
+ * plantas (las coordenadas de textura van en metros: cada ventana mide lo
+ * mismo, sea el edificio alto o bajo) y algo en el tejado (la caseta de la
+ * escalera, depósitos). Todos juntos en una sola malla: una llamada de dibujo.
+ */
+function crearCiudad(): THREE.Mesh {
   const azar = crearAzar(4403);
   const N = 320;
-  const bloques = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ roughness: 0.9 }), N);
   const colores = [0xe6d2ad, 0xf2eee6, 0xd39a6f, 0xeedc9a, 0xe7c8b8, 0xc9b79c].map((c) => new THREE.Color(c));
+  const piezas: THREE.BufferGeometry[] = [];
+  const anchoTextura = VENTANA.ancho * VENTANA.casillas;
+  const altoTextura = VENTANA.alto * VENTANA.casillas;
+  /** Una caja con la textura en metros en los lados y lisa (pared) arriba y abajo. */
+  const caja = (w: number, h: number, d: number, color: THREE.Color, conVentanas: boolean) => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    const uv = g.attributes.uv!;
+    // Caras de BoxGeometry, 4 vértices cada una: +x, −x, +y, −y, +z, −z.
+    for (let cara = 0; cara < 6; cara++) {
+      const ancho = cara < 2 ? d : w;
+      for (let k = 0; k < 4; k++) {
+        const i = cara * 4 + k;
+        if (cara === 2 || cara === 3 || !conVentanas) uv.setXY(i, 0.01, 0.01); // la esquina de la casilla es pared
+        else uv.setXY(i, (uv.getX(i) * ancho) / anchoTextura, (uv.getY(i) * h) / altoTextura);
+      }
+    }
+    const c = new Float32Array(uv.count * 3);
+    for (let i = 0; i < uv.count; i++) c.set([color.r, color.g, color.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    return g;
+  };
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
+  const eje = new THREE.Vector3(0, 1, 0);
+  const uno = new THREE.Vector3(1, 1, 1);
   let puestos = 0;
   for (let intento = 0; puestos < N && intento < N * 10; intento++) {
     const x = entre(azar, -760, 760);
@@ -476,16 +586,21 @@ function crearCiudad(): THREE.InstancedMesh {
     // Fuera del jardín (y del mar, que está detrás de la pista).
     if (x > BORDES_VALENCIA.x0 - 60 && x < BORDES_VALENCIA.x1 + 80 && z > BORDES_VALENCIA.z0 - 70 && z < BORDES_VALENCIA.z1 + 70) continue;
     if (x < -700) continue;
-    const ancho = entre(azar, 18, 40);
-    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.round(azar() * 3) * (Math.PI / 2) + entre(azar, -0.1, 0.1));
-    m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(ancho, entre(azar, 14, 64), entre(azar, 18, 40)));
-    bloques.setMatrixAt(puestos, m);
-    bloques.setColorAt(puestos++, colores[Math.floor(azar() * colores.length)]!);
+    // Medidas en ventanas y plantas enteras: las ventanas quedan alineadas con las esquinas.
+    const w = VENTANA.ancho * Math.round(entre(azar, 4, 10));
+    const d = VENTANA.ancho * Math.round(entre(azar, 4, 10));
+    const h = VENTANA.alto * Math.round(entre(azar, 4, 20));
+    const color = colores[Math.floor(azar() * colores.length)]!;
+    const edificio = caja(w, h, d, color, true).translate(0, h / 2, 0);
+    // En el tejado: la caseta de la escalera y a veces un depósito gris.
+    const tejado = [caja(w * 0.25, 3, d * 0.2, color, false).translate(w * entre(azar, -0.25, 0.25), h + 1.5, d * entre(azar, -0.25, 0.25))];
+    if (azar() < 0.5) tejado.push(caja(3, 2.4, 3, new THREE.Color(0x9a9ea3), false).translate(-w * 0.3, h + 1.2, d * 0.3));
+    q.setFromAxisAngle(eje, Math.round(azar() * 3) * (Math.PI / 2) + entre(azar, -0.1, 0.1));
+    m.compose(new THREE.Vector3(x, 0, z), q, uno);
+    for (const g of [edificio, ...tejado]) piezas.push(g.applyMatrix4(m));
+    puestos++;
   }
-  bloques.count = puestos;
-  bloques.instanceMatrix.needsUpdate = true;
-  if (bloques.instanceColor) bloques.instanceColor.needsUpdate = true;
-  bloques.computeBoundingSphere();
+  const bloques = new THREE.Mesh(mergeGeometries(piezas), new THREE.MeshStandardMaterial({ map: texturaVentanas(), vertexColors: true, roughness: 0.85 }));
   bloques.name = 'ciudad';
   return bloques;
 }
