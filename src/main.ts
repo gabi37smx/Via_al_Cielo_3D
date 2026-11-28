@@ -23,6 +23,7 @@ import { crearCamaraTerceraPersona, giroHaciaPared } from './mundo/camara.ts';
 import { crearCueva } from './mundo/cueva.ts';
 import { crearEscena, mezclaEscenario } from './mundo/escena.ts';
 import { crearEstalactitas, crearGrieta } from './mundo/grieta.ts';
+import { crearAdornos } from './mundo/adornos.ts';
 import { crearFragmentos, crearMurcielagos } from './mundo/objetos.ts';
 import { crearSombra } from './mundo/sombra.ts';
 import { crearTexturaRoca } from './mundo/texturas.ts';
@@ -118,6 +119,9 @@ mundo.escena.add(
   crearEstalactitas(tramo, 0x5a5146, 2201), // el techo de la cueva
   crearGrieta(rocaGrieta, tramos[1]!),
   crearTorre(tramos[1]!, piedraGrieta),
+  // Fósiles, esqueletos, cráneos, cofres… (solo se ven: no se pisan).
+  crearAdornos(tramo, { semilla: 5101, dinosaurios: 3, personas: 5, amonites: 0, craneos: 14, delSuelo: true, hueso: 0xd8cdb0 }),
+  crearAdornos(tramos[1]!, { semilla: 5102, dinosaurios: 1, personas: 2, amonites: 10, craneos: 8, delSuelo: false, hueso: 0xeae2cf }),
   fragmentos.grupo,
   murcielagos.grupo,
 );
