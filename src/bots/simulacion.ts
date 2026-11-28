@@ -14,7 +14,7 @@ import {
   pasoPartida,
   type Peligros,
 } from '../reglas/partida.ts';
-import { INDICE_LADERA, alturaSueloLadera, generarLadera, limiteMundo, salidaLadera, type Limite } from '../reglas/ladera.ts';
+import { INDICE_LADERA, alturaSueloLadera, conCrampones, generarLadera, limiteMundo, salidaLadera, type Ladera, type Limite } from '../reglas/ladera.ts';
 import { generarFragmentosLadera } from '../reglas/partida.ts';
 import { alturaSuelo, generarTramo, puntoDeSalida } from '../reglas/torre.ts';
 import { crearCerebro, siguienteObjetivoLadera, type Cerebro } from './cerebro.ts';
@@ -55,6 +55,8 @@ interface Escenario {
   peligros: Peligros;
   salida: { x: number; z: number };
   cerebro: Cerebro;
+  /** En la ladera: para ponerse los crampones. */
+  ladera?: Ladera;
 }
 
 function escenario(semilla: number, indice: number, murcielagos?: number): Escenario {
@@ -68,6 +70,7 @@ function escenario(semilla: number, indice: number, murcielagos?: number): Escen
       peligros: { fragmentos: generarFragmentosLadera(semilla, l), murcielagos: [] },
       salida: salidaLadera(l),
       cerebro: crearCerebro((e, apoyo) => siguienteObjetivoLadera(e, l, apoyo)),
+      ladera: l,
     };
   }
   const tramo = generarTramo(semilla, indice);
@@ -85,7 +88,7 @@ function escenario(semilla: number, indice: number, murcielagos?: number): Escen
 }
 
 export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): ResultadoSimulacion {
-  const { base, rellano, suelo, limite, peligros, salida, cerebro } = escenario(semilla, op.tramo ?? 0, op.murcielagos);
+  const { base, rellano, suelo, limite, peligros, salida, cerebro, ladera } = escenario(semilla, op.tramo ?? 0, op.murcielagos);
   const e = crearEscalador(salida.x, base, salida.z);
   const partida = crearPartida();
   partida.alturaMaxima = base;
@@ -97,6 +100,7 @@ export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): Res
   const tope = op.limite ?? 300;
   for (let t = 0; t < tope; t += PASO) {
     const sucesos = pasoEscalador(e, cerebro.pensar(e), suelo, PASO, limite);
+    if (ladera) e.crampones = conCrampones(ladera, e.x, e.y, e.z, e.crampones);
     if (sucesos.salto) r.saltos++;
     if (sucesos.dobleSalto) r.doblesSaltos++;
     if (sucesos.agarre) r.agarres++;

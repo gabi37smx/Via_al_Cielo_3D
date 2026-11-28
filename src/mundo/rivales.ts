@@ -59,9 +59,19 @@ export interface PoseRival {
   visible: boolean;
 }
 
-export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>) {
+/** ¿Lleva crampones quien está en (x, y, z)? `antes`: si los llevaba (ver reglas/ladera.ts). */
+export type ReglaCrampones = (x: number, y: number, z: number, antes: boolean) => boolean;
+
+export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>, crampones: ReglaCrampones = () => false) {
   const rivales = new Map<string, Rival>();
   const delOrdenador = new Map<string, Personaje>();
+  /** Si cada personaje lleva los crampones (se decide por dónde está). */
+  const conCrampones = new WeakMap<Personaje, boolean>();
+  function ponerCrampones(p: Personaje, x: number, y: number, z: number) {
+    const ahora = crampones(x, y, z, conCrampones.get(p) ?? false);
+    conCrampones.set(p, ahora);
+    p.ponerCrampones(ahora);
+  }
 
   return {
     /** Ajusta los rivales a la lista de la sala (entra alguien, se va alguien). */
@@ -105,6 +115,7 @@ export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>
         personaje.raiz.visible = p.visible;
         personaje.colocar(p.x, p.y, p.z, p.orientacion);
         personaje.animar(p.postura, p.rapidez, p.progreso, dt);
+        ponerCrampones(personaje, p.x, p.y, p.z);
       }
     },
     recibir(id: string, e: EstadoRed, ahora: number) {
@@ -119,6 +130,7 @@ export function crearRivales(escena: THREE.Scene, modelos: Record<Aspecto, GLTF>
         r.personaje.raiz.visible = true;
         r.personaje.colocar(e.x, e.y, e.z, e.orientacion);
         r.personaje.animar(e.postura, e.rapidez, e.voltereta, dt);
+        ponerCrampones(r.personaje, e.x, e.y, e.z);
       }
     },
     /** Altura de cada rival (para la lista de la sala). */

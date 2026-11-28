@@ -128,6 +128,8 @@ export const DURACION: Record<Sonido, number> = {
   victoria: 1.6,
   finCarrera: 0.8,
   gota: 0.35,
+  crampones: 0.45,
+  pasoNieve: 0.12,
 };
 
 /**
@@ -235,6 +237,19 @@ export function tocar(ctx: Contexto, destino: AudioNode, sonido: Sonido, t0: num
       break;
     case 'finCarrera':
       melodia(ctx, destino, t0, [MI5, SOL5], 0.18, 0.55, 0.13);
+      break;
+    case 'crampones':
+      // Los crampones al engancharse a la bota: dos clics metálicos y un tintineo.
+      soplo(ctx, destino, { filtro: 'bandpass', desde: 3200, q: 4, t0, dur: 0.04, vol: 0.35 });
+      tono(ctx, destino, { forma: 'square', desde: 2100 * v, t0, dur: 0.05, vol: 0.05, ataque: 0.001 });
+      soplo(ctx, destino, { filtro: 'bandpass', desde: 3600, q: 4, t0: t0 + 0.12, dur: 0.04, vol: 0.35 });
+      tono(ctx, destino, { forma: 'square', desde: 2300 * v, t0: t0 + 0.12, dur: 0.05, vol: 0.05, ataque: 0.001 });
+      campana(ctx, destino, 2600 * v, t0 + 0.14, 0.28, 0.05);
+      break;
+    case 'pasoNieve':
+      // Nieve que cruje bajo la bota y el pinchito de los crampones.
+      soplo(ctx, destino, { filtro: 'bandpass', desde: 900 * v, hasta: 500 * v, q: 0.9, t0, dur: 0.1, vol: 0.2 * (0.5 + fuerza * 0.5), ataque: 0.01 });
+      soplo(ctx, destino, { filtro: 'highpass', desde: 5000, t0, dur: 0.025, vol: 0.06 * (0.5 + fuerza * 0.5) });
       break;
     case 'gota': {
       // Gota de agua en la cueva y su eco.

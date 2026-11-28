@@ -30,6 +30,8 @@ export interface Personaje {
   animar(postura: Postura, rapidez: number, progreso: number, dt: number): void;
   /** Aplastamiento breve al tocar el suelo. */
   aterrizar(fuerza: number): void;
+  /** Enseña u oculta los crampones de las botas (decisión 041). */
+  ponerCrampones(puestos: boolean): void;
 }
 
 /** Altura del escalador (m). */
@@ -120,6 +122,54 @@ export async function cargarModelos(): Promise<Record<Aspecto, GLTF>> {
 }
 
 /**
+ * La suela de cada bota del modelo a 1,7 m (m), medida con el esqueleto
+ * aplicado: 30 cm de ancho y 46 de largo, centrada un poco hacia el talón.
+ */
+const SUELA = { ancho: 0.3, largo: 0.46, centroZ: -0.017, alto: 0.085 } as const;
+
+/** Un crampón (en metros, con la planta en y = 0): se comparte entre todos. */
+let cramponModelo: THREE.Group | undefined;
+function crearCrampones(): THREE.Group {
+  if (cramponModelo) return cramponModelo;
+  // Acero oscuro (la suela es gris clara: así se distingue) y correas rojas.
+  const metal = new THREE.MeshStandardMaterial({ color: 0x3d434b, metalness: 0.85, roughness: 0.3 });
+  const correa = new THREE.MeshStandardMaterial({ color: 0xd8312a, roughness: 0.7 });
+  const { ancho, largo, alto } = SUELA;
+  const g = new THREE.Group();
+  // El marco, un poco más grande que la suela: asoma por los lados.
+  const marco = new THREE.Mesh(new THREE.BoxGeometry(ancho + 0.03, 0.03, largo + 0.02), metal);
+  marco.position.y = 0.015;
+  g.add(marco);
+  // Pinchos por el borde, hacia abajo y un poco hacia fuera (se ven de lado).
+  const pincho = new THREE.ConeGeometry(0.022, 0.08, 5);
+  pincho.rotateX(Math.PI); // la punta hacia abajo
+  for (const lado of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const p = new THREE.Mesh(pincho, metal);
+      p.position.set(lado * (ancho / 2 + 0.005), -0.015, (i / 3 - 0.5) * largo * 0.8);
+      p.rotation.z = -lado * 0.35;
+      g.add(p);
+    }
+    // Las dos puntas de delante, hacia delante y abajo.
+    const punta = new THREE.Mesh(pincho, metal);
+    punta.rotation.x = -Math.PI / 2.6;
+    punta.position.set(lado * ancho * 0.18, 0.005, largo / 2 + 0.03);
+    g.add(punta);
+  }
+  // Las correas rojas: una sobre la punta de la bota y otra por el talón.
+  const delante = new THREE.Mesh(new THREE.BoxGeometry(ancho + 0.04, 0.035, 0.06), correa);
+  delante.position.set(0, alto + 0.01, largo * 0.22);
+  const detras = new THREE.Mesh(new THREE.BoxGeometry(ancho + 0.04, 0.035, 0.06), correa);
+  detras.position.set(0, alto + 0.01, -largo * 0.38);
+  g.add(delante, detras);
+  g.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) o.castShadow = true;
+  });
+  cramponModelo = g;
+  return g;
+}
+
+/**
  * Un escalador nuevo a partir del modelo ya descargado. Se clona con
  * `SkeletonUtils.clone`: con `clone()` normal todos los clones compartirían
  * los huesos y se moverían a la vez (tropiezo de la sesión 3 del curso).
@@ -181,6 +231,30 @@ export function crearPersonaje(gltf: GLTF): Personaje {
     actual = nueva;
   }
 
+  // Los crampones: un marco de metal con pinchos bajo cada bota y una correa
+  // roja. Van pegados al hueso de cada pierna: se mueven con el pie.
+  const crampones = crearCrampones();
+  for (const nombre of ['leg-left', 'leg-right']) {
+    const pierna = modelo.getObjectByName(nombre);
+    if (!pierna) continue;
+    modelo.updateMatrixWorld(true);
+    const centro = new THREE.Vector3();
+    pierna.getWorldPosition(centro);
+    const escalaPierna = new THREE.Vector3();
+    pierna.getWorldScale(escalaPierna);
+    const crampon = crampones.clone();
+    crampon.scale.setScalar(1 / escalaPierna.x);
+    // Bajo la suela: en el suelo (y = 0 de la raíz), centrado en la bota.
+    crampon.position.copy(pierna.worldToLocal(new THREE.Vector3(centro.x, 0, SUELA.centroZ)));
+    crampon.visible = false;
+    crampon.name = 'crampon';
+    pierna.add(crampon);
+  }
+  const piezasCrampon: THREE.Object3D[] = [];
+  modelo.traverse((o) => {
+    if (o.name === 'crampon') piezasCrampon.push(o);
+  });
+
   let aplastado = 0;
 
   return {
@@ -216,6 +290,9 @@ export function crearPersonaje(gltf: GLTF): Personaje {
     },
     aterrizar(fuerza) {
       aplastado = Math.min(Math.max(fuerza, 0.3), 1);
+    },
+    ponerCrampones(puestos) {
+      for (const c of piezasCrampon) c.visible = puestos;
     },
   };
 }

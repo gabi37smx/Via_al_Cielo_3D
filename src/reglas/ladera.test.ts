@@ -6,12 +6,22 @@ import {
   ANCHO_ZIGZAG,
   BASE_LADERA,
   CIMA,
+  CRAMPONES,
   D_CARA,
+  FONDO_CIMA,
+  FONDO_MAX,
+  INCLINACION_HIELO,
+  PENDIENTE,
+  PICO,
   RADIO_COLINA,
   TUNEL,
   aLocal,
   aMundo,
+  alturaBorde,
+  alturaEnSaliente,
   alturaSueloLadera,
+  centroPico,
+  conCrampones,
   dCara,
   generarLadera,
   acortarFuera,
@@ -66,6 +76,19 @@ describe('generarLadera', () => {
       expect(Math.max(...l.salientes.map((x) => Math.abs(x.u)))).toBeGreaterThan(ANCHO_ZIGZAG - 3);
     }
   });
+
+  it('cada saliente sale lo que se ha alejado la cara: un salto de lado desde la pared del de abajo cae encima', () => {
+    for (const s of SEMILLAS) {
+      const l = generarLadera(s);
+      for (let i = 1; i < l.salientes.length; i++) {
+        const [a, b] = [l.salientes[i - 1]!, l.salientes[i]!];
+        expect(b.fondo).toBeLessThanOrEqual(FONDO_MAX + 1e-9);
+        // Su borde de fuera queda al menos 1,4 m por delante de la pared del de abajo.
+        expect(dCara(b.y) - b.fondo).toBeLessThanOrEqual(dCara(a.y) - 1.4);
+        expect(b.fondo).toBeGreaterThanOrEqual(Math.min(1.4 + (b.y - a.y) * PENDIENTE, FONDO_MAX) - 1e-9);
+      }
+    }
+  });
 });
 
 describe('dónde se pisa en la ladera', () => {
@@ -82,17 +105,37 @@ describe('dónde se pisa en la ladera', () => {
 
   it('encima de un saliente, su altura (de un sentido: desde abajo no cuenta)', () => {
     const s = l.salientes[5]!;
-    const p = aMundo(l, dCara(s.y) - s.fondo / 2, s.u);
-    expect(sobreSalienteLadera(s, dCara(s.y) - s.fondo / 2, s.u)).toBe(true);
-    expect(alturaSueloLadera(l, p.x, p.z, s.y + 0.01)).toBe(s.y);
-    expect(alturaSueloLadera(l, p.x, p.z, s.y - 0.5)).toBeLessThan(s.y);
+    const mitad = dCara(s.y) - s.fondo / 2;
+    const p = aMundo(l, mitad, s.u);
+    const h = s.y + (s.fondo / 2) * INCLINACION_HIELO;
+    expect(sobreSalienteLadera(s, mitad, s.u)).toBe(true);
+    expect(alturaSueloLadera(l, p.x, p.z, h + 0.01)).toBeCloseTo(h);
+    expect(alturaSueloLadera(l, p.x, p.z, h - 0.5)).toBeLessThan(s.y);
   });
 
-  it('la cima ocupa todo el ancho, desde el borde de la cara', () => {
-    for (const u of [-ANCHO_CIMA / 2 + 1, 0, ANCHO_CIMA / 2 - 1]) {
-      const p = aMundo(l, dCara(CIMA) - 1, u);
-      expect(alturaSueloLadera(l, p.x, p.z, CIMA + 1)).toBe(CIMA);
+  it('es una cuña de hielo: lo más bajo junto a la pared y sube hacia el borde de fuera', () => {
+    const s = l.salientes[8]!;
+    const cara = dCara(s.y);
+    expect(alturaEnSaliente(s, cara)).toBeCloseTo(s.y);
+    expect(alturaEnSaliente(s, cara - s.fondo)).toBeCloseTo(alturaBorde(s));
+    expect(alturaBorde(s) - s.y).toBeCloseTo(s.fondo * INCLINACION_HIELO);
+    // Cuesta suave (≈ 7°): menos de medio metro de punta a punta.
+    expect(alturaBorde(s) - s.y).toBeLessThan(0.55);
+    // Hacia la pared, cada vez más bajo.
+    const alturas = [0.9, 0.6, 0.3, 0.05].map((f) => alturaEnSaliente(s, cara - s.fondo * f));
+    for (let i = 1; i < alturas.length; i++) expect(alturas[i]!).toBeLessThan(alturas[i - 1]!);
+  });
+
+  it('la cima ocupa todo el ancho, desde un borde que apenas sobresale de la cara hacia dentro', () => {
+    for (const u of [-ANCHO_CIMA / 2 + 1, 0, ANCHO_CIMA / 2 - 1, 80]) {
+      for (const d of [dCara(CIMA) - FONDO_CIMA + 0.05, dCara(CIMA) + 6, dCara(CIMA) + PICO.atras - 1]) {
+        const p = aMundo(l, d, u);
+        expect(alturaSueloLadera(l, p.x, p.z, CIMA + 1)).toBe(CIMA);
+      }
     }
+    // Un metro por delante del borde ya no hay cima (se ve el borde y se cae).
+    const fuera = aMundo(l, dCara(CIMA) - FONDO_CIMA - 1, 0);
+    expect(alturaSueloLadera(l, fuera.x, fuera.z, CIMA + 1)).toBeLessThan(CIMA);
   });
 
   it('se empieza en la explanada, delante del pasillo', () => {
@@ -146,6 +189,46 @@ describe('por dónde no se pasa (límite del mundo)', () => {
 
   it('por encima de la colina se puede pasar por encima del pozo', () => {
     expect(prueba(15, 6, ALTO_COLINA + 1).choque).toBeNull();
+  });
+
+  it('en la cima no hay cara delante: se anda hacia dentro hasta el pie del pico, que no deja pasar', () => {
+    expect(prueba(dCara(CIMA) + 8, 3, CIMA).choque).toBeNull();
+    const contraElPico = prueba(dCara(CIMA) + PICO.atras + 5, 0, CIMA);
+    expect(contraElPico.choque).not.toBeNull();
+    expect(contraElPico.d).toBeCloseTo(dCara(CIMA) + PICO.atras - R);
+    const c = centroPico(l);
+    const p = aMundo(l, dCara(CIMA) + PICO.atras + 2, 10);
+    limite(p, CIMA);
+    expect(Math.hypot(p.x - c.x, p.z - c.z)).toBeCloseTo(PICO.radio + R);
+  });
+});
+
+describe('los crampones', () => {
+  const l = generarLadera(17);
+  const en = (d: number, u: number, y: number, antes = false) => {
+    const p = aMundo(l, d, u);
+    return conCrampones(l, p.x, y, p.z, antes);
+  };
+
+  it('se ponen al pasar por delante del soporte del pasillo, antes de salir a la nieve', () => {
+    expect(en(CRAMPONES.d - 1, 0, BASE_LADERA)).toBe(false);
+    expect(en(CRAMPONES.d + 0.1, 0, BASE_LADERA)).toBe(true);
+    expect(CRAMPONES.d).toBeLessThan(RADIO_COLINA);
+    expect(CRAMPONES.d).toBeGreaterThan(RADIO_PARED);
+  });
+
+  it('fuera, en la ladera y en la cima, siempre puestos (también si se empieza allí)', () => {
+    const s = salidaLadera(l);
+    expect(conCrampones(l, s.x, BASE_LADERA, s.z, false)).toBe(true);
+    expect(en(dCara(500) - 1, 3, 500)).toBe(true);
+    expect(en(dCara(CIMA) + 3, 0, CIMA)).toBe(true);
+  });
+
+  it('entre el pozo y el soporte se quedan como estaban; en el pozo, fuera', () => {
+    expect(en(CRAMPONES.d - 2, 0, BASE_LADERA, true)).toBe(true);
+    expect(en(CRAMPONES.d - 2, 0, BASE_LADERA, false)).toBe(false);
+    expect(en(5, 0, BASE_LADERA, true)).toBe(false);
+    expect(en(11, 0, 300, true)).toBe(false);
   });
 });
 

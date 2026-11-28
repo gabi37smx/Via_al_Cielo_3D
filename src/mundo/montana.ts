@@ -5,8 +5,9 @@
  * - El PASILLO que sale del pozo a 440 m (suelo, paredes y techo de roca,
  *   con unos farolillos que brillan) y la COLINA de roca que rodea el pozo.
  * - La EXPLANADA nevada, con pinos.
- * - La CARA de la montaña (roca gris) con los SALIENTES blancos de nieve en
- *   zigzag (las «presas» blancas del 2D) y, arriba, la CIMA con una bandera.
+ * - La CARA de la montaña (roca gris) con los SALIENTES (cuñas de hielo) en
+ *   zigzag (las «presas» blancas del 2D) y, arriba, la CIMA con su borde de
+ *   roca, balizas y una bandera. En el pasillo, el soporte de los crampones.
  * - El paisaje: cielo con degradado, nubes y montañas nevadas al fondo.
  *
  * Lo que se pisa sale solo de reglas/ladera.ts; esto solo dibuja. Casi todo
@@ -17,13 +18,19 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { crearAzar, entre } from '../reglas/azar.ts';
 import {
   ALTO_COLINA,
+  ANCHO_CARA,
+  ANCHO_CIMA,
+  CRAMPONES,
   D_CARA,
   FONDO_CIMA,
+  INCLINACION_HIELO,
+  PICO,
   RADIO_COLINA,
   RADIO_MUNDO,
   TUNEL,
   aLocal,
   aMundo,
+  alturaEnSaliente,
   dCara,
   ejes,
   type Ladera,
@@ -86,6 +93,68 @@ function crearPasillo(l: Ladera, tex: TexturasMontana): THREE.Group {
     }
   }
   grupo.add(new THREE.Mesh(enMarco(l, mergeGeometries(luces)), new THREE.MeshBasicMaterial({ color: 0xff9a2e })));
+  grupo.add(crearSoporteCrampones(l));
+  return grupo;
+}
+
+/**
+ * El soporte de los crampones, en la pared del pasillo justo antes de salir a
+ * la nieve: una tabla de madera con tres pares colgados y un cartel con un
+ * copo de nieve. Al pasar por delante, el escalador se pone un par (ver
+ * conCrampones en reglas/ladera.ts).
+ */
+function crearSoporteCrampones(l: Ladera): THREE.Group {
+  const grupo = new THREE.Group();
+  grupo.name = 'soporte-crampones';
+  // En el marco de las geometrías (ver enMarco) la x local va al revés que u.
+  const lado = -CRAMPONES.lado;
+  const pared = lado * (TUNEL.ancho / 2);
+  const madera: THREE.BufferGeometry[] = [];
+  const metal: THREE.BufferGeometry[] = [];
+  const correas: THREE.BufferGeometry[] = [];
+  // La tabla, pegada a la pared, a la altura del pecho.
+  const tabla = new THREE.BoxGeometry(0.06, 0.7, 1.5);
+  tabla.translate(pared - lado * 0.03, l.base + 1.35, CRAMPONES.d);
+  madera.push(tabla);
+  // Tres pares de crampones colgados de sus ganchos.
+  for (let i = 0; i < 3; i++) {
+    const d = CRAMPONES.d + (i - 1) * 0.45;
+    for (const pie of [-1, 1]) {
+      const z = d + pie * 0.1;
+      const gancho = new THREE.CylinderGeometry(0.012, 0.012, 0.12, 5).rotateZ(Math.PI / 2);
+      gancho.translate(pared - lado * 0.1, l.base + 1.55, z);
+      metal.push(gancho);
+      // El marco (de pie, colgando) con sus pinchos hacia fuera.
+      const marco = new THREE.BoxGeometry(0.02, 0.28, 0.16);
+      marco.translate(pared - lado * 0.14, l.base + 1.38, z);
+      metal.push(marco);
+      for (let k = 0; k < 4; k++) {
+        const pincho = new THREE.ConeGeometry(0.014, 0.05, 4).rotateZ(lado * (Math.PI / 2));
+        pincho.translate(pared - lado * 0.17, l.base + 1.28 + k * 0.06, z + (k % 2 ? 0.05 : -0.05));
+        metal.push(pincho);
+      }
+      const correa = new THREE.BoxGeometry(0.025, 0.03, 0.17);
+      correa.translate(pared - lado * 0.15, l.base + 1.47, z);
+      correas.push(correa);
+    }
+  }
+  // El cartel: un copo de nieve blanco sobre azul, encima de la tabla.
+  const cartel = new THREE.BoxGeometry(0.04, 0.34, 0.34);
+  cartel.translate(pared - lado * 0.05, l.base + 1.95, CRAMPONES.d);
+  const copo: THREE.BufferGeometry[] = [];
+  for (let k = 0; k < 3; k++) {
+    const brazo = new THREE.BoxGeometry(0.01, 0.24, 0.025).rotateX((k * Math.PI) / 3);
+    brazo.translate(pared - lado * 0.075, l.base + 1.95, CRAMPONES.d);
+    copo.push(brazo);
+  }
+  const piezas: [THREE.BufferGeometry[], THREE.Material][] = [
+    [madera, new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 0.9 })],
+    [metal, new THREE.MeshStandardMaterial({ color: 0xa5adb5, metalness: 0.8, roughness: 0.3 })],
+    [correas, new THREE.MeshStandardMaterial({ color: 0xd8312a, roughness: 0.7 })],
+    [[cartel], new THREE.MeshStandardMaterial({ color: 0x2f6fb5, roughness: 0.6 })],
+    [copo, new THREE.MeshBasicMaterial({ color: 0xffffff })],
+  ];
+  for (const [geos, material] of piezas) grupo.add(new THREE.Mesh(enMarco(l, mergeGeometries(geos)), material));
   return grupo;
 }
 
@@ -135,7 +204,7 @@ function crearTerreno(l: Ladera, tex: TexturasMontana): THREE.Group {
   // relieve, siempre HACIA DENTRO de la montaña (si saliera hacia fuera, el
   // escalador se metería en la roca al pegarse a ella).
   const azar = crearAzar(6601);
-  const anchoU = 600;
+  const anchoU = ANCHO_CARA;
   const [nu, ny] = [120, 44];
   const cara = new THREE.PlaneGeometry(anchoU, 1, nu, ny);
   const pos = cara.attributes.position!;
@@ -144,7 +213,8 @@ function crearTerreno(l: Ladera, tex: TexturasMontana): THREE.Group {
   for (let i = 0; i < pos.count; i++) {
     const u = pos.getX(i);
     const t = pos.getY(i) + 0.5; // 0 abajo, 1 arriba
-    const y = l.base - 2 + t * (l.rellano + 2 - l.base);
+    // Hasta justo debajo de la cima: por encima no asoma roca entre la nieve.
+    const y = l.base - 2 + t * (l.rellano - 0.02 - (l.base - 2));
     const d = dCara(Math.max(y, l.base)) + ruido[i]! * 0.6 + (y < l.base ? 0.5 : 0);
     pos.setXYZ(i, u, y, d);
     uv.setXY(i, u / 6, y / 6);
@@ -155,16 +225,34 @@ function crearTerreno(l: Ladera, tex: TexturasMontana): THREE.Group {
   malla.name = 'cara';
   grupo.add(malla);
 
-  // La cima: una explanada de nieve desde el borde de la cara hacia dentro.
-  const fondoCima = 60;
-  const cima = new THREE.Mesh(enMarco(l, new THREE.BoxGeometry(anchoU, 1, fondoCima).translate(0, l.rellano - 0.5, dCara(l.rellano) - FONDO_CIMA + fondoCima / 2)), materialRoca(tex.nieve, 40, 4));
+  // La cima: un bloque de ROCA que remata la cara (su frente oscuro se ve
+  // desde abajo y desde arriba) y encima la nieve, que empieza medio metro
+  // por detrás del borde: arriba queda una raya de roca que marca el borde.
+  const borde = dCara(l.rellano) - FONDO_CIMA;
+  const fondoCima = PICO.atras + 40;
+  const grueso = 3;
+  const rocaCima = new THREE.Mesh(
+    enMarco(l, new THREE.BoxGeometry(anchoU, grueso, fondoCima).translate(0, l.rellano - grueso / 2 - 0.01, borde + fondoCima / 2)),
+    materialRoca(tex.roca, anchoU / 6, 1, { color: 0x6f747b }),
+  );
+  rocaCima.receiveShadow = true;
+  const RAYA = 0.55;
+  const cima = new THREE.Mesh(
+    enMarco(l, new THREE.BoxGeometry(anchoU, 0.12, fondoCima - RAYA).translate(0, l.rellano + 0.03, borde + RAYA + (fondoCima - RAYA) / 2)),
+    materialRoca(tex.nieve, 40, 4),
+  );
   cima.receiveShadow = true;
-  // El pico de verdad, detrás: un cono con nieve.
-  const pico = new THREE.Mesh(new THREE.ConeGeometry(55, 110, 9, 4), materialRoca(tex.nieve, 8, 8, { flatShading: true }));
-  const sitioPico = aMundo(l, dCara(l.rellano) + 55, 0);
-  pico.position.set(sitioPico.x, l.rellano + 52, sitioPico.z);
-  // La bandera de la cima, en el medio, un poco hacia dentro.
-  const sitioBandera = aMundo(l, dCara(l.rellano) - FONDO_CIMA + 3, 0);
+  // Balizas a lo largo del borde (rojas y blancas): se ven desde lejos.
+  grupo.add(crearBalizas(l, borde + 0.35));
+  // El pico de verdad, detrás: un cono con nieve. Su pie, a la altura de la
+  // cima, mide PICO.radio: hasta ahí se puede andar (reglas/ladera.ts).
+  const BAJO = 2;
+  const radioBase = PICO.radio / (1 - BAJO / 110);
+  const pico = new THREE.Mesh(new THREE.ConeGeometry(radioBase, 110, 20, 4), materialRoca(tex.nieve, 8, 8, { flatShading: true }));
+  const sitioPico = aMundo(l, dCara(l.rellano) + PICO.atras + PICO.radio, 0);
+  pico.position.set(sitioPico.x, l.rellano - BAJO + 55, sitioPico.z);
+  // La bandera de la cima, en el medio, unos pasos hacia dentro.
+  const sitioBandera = aMundo(l, borde + 4, 0);
   const mastil = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4, 6), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.6, roughness: 0.4 }));
   mastil.position.set(sitioBandera.x, l.rellano + 2, sitioBandera.z);
   // La tela, de cara a quien sube (su plano mira hacia el pasillo), ondeando hacia un lado.
@@ -172,7 +260,35 @@ function crearTerreno(l: Ladera, tex: TexturasMontana): THREE.Group {
   const tela = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1), new THREE.MeshStandardMaterial({ color: 0xe0362b, side: THREE.DoubleSide, roughness: 0.8 }));
   tela.position.set(sitioBandera.x + e.tx * 0.8, l.rellano + 3.4, sitioBandera.z + e.tz * 0.8);
   tela.rotation.y = Math.atan2(e.nx, e.nz);
-  grupo.add(cima, pico, mastil, tela);
+  grupo.add(rocaCima, cima, pico, mastil, tela);
+  return grupo;
+}
+
+/** Postes rojos y blancos a lo largo del borde de la cima, por donde se llega. */
+function crearBalizas(l: Ladera, d: number): THREE.Group {
+  const grupo = new THREE.Group();
+  grupo.name = 'balizas';
+  const SEPARACION = 2.5;
+  const mitad = ANCHO_CIMA / 2 + 6;
+  const n = Math.floor((mitad * 2) / SEPARACION) + 1;
+  const ALTO = 0.9;
+  // Cada poste: tres franjas (roja, blanca, roja).
+  const franja = new THREE.CylinderGeometry(0.05, 0.05, ALTO / 3, 6);
+  const rojo = new THREE.InstancedMesh(franja, new THREE.MeshStandardMaterial({ color: 0xd8312a, roughness: 0.6 }), n * 2);
+  const blanco = new THREE.InstancedMesh(franja, new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.6 }), n);
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < n; i++) {
+    const p = aMundo(l, d, -mitad + i * SEPARACION);
+    rojo.setMatrixAt(i * 2, m.makeTranslation(p.x, l.rellano + ALTO / 6, p.z));
+    blanco.setMatrixAt(i, m.makeTranslation(p.x, l.rellano + ALTO / 2, p.z));
+    rojo.setMatrixAt(i * 2 + 1, m.makeTranslation(p.x, l.rellano + (ALTO * 5) / 6, p.z));
+  }
+  for (const im of [rojo, blanco]) {
+    im.castShadow = true;
+    im.instanceMatrix.needsUpdate = true;
+    im.computeBoundingSphere();
+    grupo.add(im);
+  }
   return grupo;
 }
 
@@ -184,7 +300,10 @@ function crearSalientes(l: Ladera, tex: TexturasMontana): THREE.Group {
   const porForma = Array.from({ length: FORMAS }, () => [] as number[]);
   l.salientes.forEach((_, i) => porForma[i % FORMAS]!.push(i));
   const e = ejes(l);
-  const giro = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(e.nx, e.nz));
+  // Cuñas de hielo: además del giro hacia la montaña, inclinadas (bajan hacia la pared).
+  const giro = new THREE.Quaternion()
+    .setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(e.nx, e.nz))
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.atan(INCLINACION_HIELO)));
   const matriz = new THREE.Matrix4();
   const posicion = new THREE.Vector3();
   const escala = new THREE.Vector3();
@@ -196,8 +315,9 @@ function crearSalientes(l: Ladera, tex: TexturasMontana): THREE.Group {
     rocas.castShadow = rocas.receiveShadow = true;
     indices.forEach((n, i) => {
       const s = l.salientes[n]!;
-      const p = aMundo(l, dCara(s.y) - s.fondo / 2 + METIDO / 2, s.u);
-      posicion.set(p.x, s.y, p.z);
+      const d = dCara(s.y) - s.fondo / 2 + METIDO / 2;
+      const p = aMundo(l, d, s.u);
+      posicion.set(p.x, alturaEnSaliente(s, d) - (METIDO / 2) * INCLINACION_HIELO, p.z);
       escala.set(s.ancho, s.grosor, s.fondo + METIDO);
       rocas.setMatrixAt(i, matriz.compose(posicion, giro, escala));
     });
@@ -206,11 +326,15 @@ function crearSalientes(l: Ladera, tex: TexturasMontana): THREE.Group {
     grupo.add(rocas);
   });
 
-  // Nieve encima: una losa fina, del tamaño de lo que se pisa (los pies se hunden 4 cm).
-  const nieve = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), materialRoca(tex.nieve, 0.5, 0.5), l.salientes.length);
+  // Hielo encima: una losa fina azulada y brillante, del tamaño de lo que se
+  // pisa (los pies se hunden 4 cm).
+  const hielo = materialRoca(tex.nieve, 0.5, 0.5, { color: 0xcfe6fb, roughness: 0.3, metalness: 0.05 });
+  hielo.roughnessMap = null;
+  const nieve = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), hielo, l.salientes.length);
   l.salientes.forEach((s, i) => {
-    const p = aMundo(l, dCara(s.y) - s.fondo / 2, s.u);
-    posicion.set(p.x, s.y + 0.02, p.z);
+    const d = dCara(s.y) - s.fondo / 2;
+    const p = aMundo(l, d, s.u);
+    posicion.set(p.x, alturaEnSaliente(s, d) + 0.02, p.z);
     escala.set(s.ancho + 0.06, 0.08, s.fondo + 0.04);
     nieve.setMatrixAt(i, matriz.compose(posicion, giro, escala));
   });

@@ -14,7 +14,7 @@ import { crearOido, sonidosDelPaso } from './sonido/sucesos.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
 import { REGLAS, generarFragmentos, generarFragmentosLadera, generarMurcielagos, murcielagosDelTramo, type Jugada } from './reglas/partida.ts';
-import { BASE_LADERA, CIMA, RADIO_COLINA, TUNEL, aLocal, aMundo, acortarFuera, alturaSueloLadera, centroSaliente, ejes, generarLadera, limiteMundo, salidaLadera } from './reglas/ladera.ts';
+import { BASE_LADERA, CIMA, RADIO_COLINA, TUNEL, aLocal, aMundo, acortarFuera, alturaEnSaliente, alturaSueloLadera, centroSaliente, conCrampones, ejes, generarLadera, limiteMundo, salidaLadera } from './reglas/ladera.ts';
 import { crearCorredor, pasoCorredor, type Corredor } from './reglas/carrera.ts';
 import { crearCarreraEnSala } from './modos/carrera.ts';
 import { crearPantallaCarrera } from './ui/carrera.ts';
@@ -155,7 +155,7 @@ function sitioDeInicio(): { x: number; y: number; z: number } {
     const s = ladera.salientes.find((x) => x.y >= alturaInicial);
     if (!s || alturaInicial === BASE_LADERA) return { ...salidaLadera(ladera), y: BASE_LADERA };
     const c = centroSaliente(s);
-    return { ...aMundo(ladera, c.d, c.u), y: s.y };
+    return { ...aMundo(ladera, c.d, c.u), y: alturaEnSaliente(s, c.d) };
   }
   const todos = tramos.flatMap((t) => t.salientes);
   const inicio = todos.find((s) => s.y >= alturaInicial) ?? todos[0]!;
@@ -180,7 +180,7 @@ const camara = crearCamaraTerceraPersona(
 );
 
 // 2 · Los rivales de la sala: aparecen y desaparecen según la presencia de Supabase.
-const rivales = crearRivales(mundo.escena, modelos);
+const rivales = crearRivales(mundo.escena, modelos, (x, y, z, antes) => conCrampones(ladera, x, y, z, antes));
 const lista = sala ? crearListaJugadores(document.querySelector<HTMLElement>('#sala')!, sala.codigo) : null;
 if (sala) {
   const s = sala;
@@ -212,6 +212,8 @@ function reiniciar(puestoCarrera?: number) {
   jugador = crearCorredor(tramo, puestoCarrera ?? puesto);
   const e = jugador.escalador;
   if (puestoCarrera === undefined) Object.assign(e, salida);
+  // Empezando ya fuera (?altura desde 440 m), con los crampones puestos (sin su clic).
+  e.crampones = conCrampones(ladera, e.x, e.y, e.z, false);
   const angulo = Math.atan2(e.z, e.x);
   // Mirando a la pared (fuera, a la montaña).
   e.orientacion = fuera(e.x, e.z, e.y) ? Math.atan2(ejesLadera.nx, ejesLadera.nz) : Math.atan2(Math.cos(angulo), Math.sin(angulo));
@@ -323,7 +325,7 @@ const bucle = crearBucle({
       ? { ...QUIETO, giroCamara: camara.giro }
       : { moverX: m.moverX, moverY: m.moverY, saltar: m.saltar, giroCamara: camara.giro };
     const tiempo = carrera ? carrera.estado.tiempo : jugador.partida.tiempo;
-    const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso, limite);
+    const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso, limite, ladera);
     if (r.sucesos.aterrizaje > 0.5) personaje.aterrizar(r.sucesos.aterrizaje / 6);
     if (r.reaparecio) Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
     recordEnEstePaso = false;
@@ -372,6 +374,7 @@ const bucle = crearBucle({
 
     personaje.colocar(pintado.x, pintado.y, pintado.z, e.orientacion);
     personaje.animar(e.postura, Math.hypot(e.vx, e.vz), progresoPostura(e), dtReal);
+    personaje.ponerCrampones(e.crampones);
     // Parpadea mientras es invulnerable; esperando a reaparecer, no se ve.
     personaje.raiz.visible =
       jugador.reaparecerEn === 0 && (partida.invulnerable === 0 || Math.floor(partida.invulnerable * 12) % 2 === 0);

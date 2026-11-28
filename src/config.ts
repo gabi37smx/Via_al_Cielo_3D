@@ -28,6 +28,17 @@ export const CONFIG = {
     /** Duración de la voltereta del doble salto (s). */
     voltereta: 0.45,
     /*
+     * El hielo de los salientes de la montaña (decisión 041): su cara de
+     * arriba baja un poco hacia la pared y quien está encima se desliza hacia
+     * ella. Velocidad por cada metro de bajada por metro: con la cuesta de
+     * 0,12 de reglas/ladera.ts son ~2,6 m/s sin crampones y ~1 m/s con ellos.
+     */
+    deslizarHielo: 22,
+    /** Con crampones se desliza solo esta parte. */
+    deslizarConCrampones: 0.4,
+    /** Bajando una cuesta se queda pegado al suelo si está a menos de esto por debajo (m). */
+    pegarseAlSuelo: 0.12,
+    /*
      * Agarrarse al borde y trepar (idea I3). Si en el aire el borde de un
      * saliente queda delante y a la altura de las manos, se agarra.
      */

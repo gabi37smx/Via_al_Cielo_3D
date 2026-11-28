@@ -15,6 +15,11 @@
  *
  * La cara está en d = dCara(y): se aleja PENDIENTE m por cada metro de subida.
  * Los salientes salen de la cara hacia el pasillo (d más pequeña).
+ *
+ * Los salientes son CUÑAS DE HIELO (decisión 041): salen de la cara lo que se
+ * ha alejado la montaña desde el anterior (así un salto de lado cae encima) y
+ * su cara de arriba baja un poco hacia la montaña (INCLINACION_HIELO): quien
+ * cae encima se desliza hacia dentro, hasta la pared, y no se va cayendo.
  */
 import { CONFIG } from '../config.ts';
 import { crearAzar, derivarSemilla, entre, type Azar } from './azar.ts';
@@ -40,8 +45,27 @@ export const D_CARA = 34;
 export const PENDIENTE = 0.45;
 /** El zigzag va de −ANCHO_ZIGZAG a +ANCHO_ZIGZAG (m de lado). */
 export const ANCHO_ZIGZAG = 16;
-/** La cima: cuánto entra en la montaña desde el borde y qué ancho tiene (m). */
-export const FONDO_CIMA = 8;
+/**
+ * La cima: cuánto sobresale su CORNISA de roca por delante de la cara (m).
+ * Poco, para que se vea el borde desde arriba y no se atraviese desde abajo.
+ */
+export const FONDO_CIMA = 0.4;
+/**
+ * Detrás de la cima se levanta el PICO (un cono): su pie empieza a ATRAS m
+ * del borde y tiene este radio a la altura de la cima (m). No se entra en él.
+ */
+export const PICO = { atras: 14, radio: 54 } as const;
+/** La cima ocupa todo lo alto de la cara (m de lado, de −A/2 a +A/2). */
+export const ANCHO_CARA = 600;
+/**
+ * Cuánto baja la cara de arriba de un saliente por cada metro hacia la
+ * montaña (≈ 7°): lo justo para que el hielo deslice hacia dentro.
+ */
+export const INCLINACION_HIELO = 0.12;
+/** Un saliente de la ladera sale de la cara, como mucho, esto (m). */
+export const FONDO_MAX = 4.2;
+/** Dónde cuelgan los crampones en el pasillo (d) y de qué lado (u). */
+export const CRAMPONES = { d: RADIO_COLINA - 3.2, lado: 1 } as const;
 /**
  * ±24 m: el descansillo de un giro puede quedar hasta 23,4 m de lado (el
  * saliente anterior a ≤ 17,6 m, más su hueco y los 3,8 m del descansillo).
@@ -59,7 +83,7 @@ export interface SalienteLadera {
   tipo: TipoSaliente;
   /** Centro de lado (m). */
   u: number;
-  /** Altura de la cara de arriba, donde se pisa (m). */
+  /** Altura de la cara de arriba JUNTO A LA PARED, lo más bajo de la cuña (m). */
   y: number;
   /** Ancho de lado (m). */
   ancho: number;
@@ -101,6 +125,22 @@ export function aMundo(l: Ladera, d: number, u: number): { x: number; z: number 
 /** Centro de lo que se pisa de un saliente, en (d, u). */
 export function centroSaliente(s: SalienteLadera): { d: number; u: number } {
   return { d: dCara(s.y) - s.fondo / 2, u: s.u };
+}
+
+/** Altura de la cara de arriba del saliente en `d`: sube hacia el borde de fuera. */
+export function alturaEnSaliente(s: SalienteLadera, d: number): number {
+  const haciaFuera = Math.min(Math.max(dCara(s.y) - d, 0), s.fondo);
+  return s.y + haciaFuera * INCLINACION_HIELO;
+}
+
+/** El centro del pico, en el plano (x, z). */
+export function centroPico(l: Ladera): { x: number; z: number } {
+  return aMundo(l, dCara(l.rellano) + PICO.atras + PICO.radio, 0);
+}
+
+/** Altura del borde de fuera del saliente (lo más alto de la cuña). */
+export function alturaBorde(s: SalienteLadera): number {
+  return s.y + s.fondo * INCLINACION_HIELO;
 }
 
 /** ¿(d, u) cae encima del saliente? */
@@ -162,9 +202,12 @@ export function generarLadera(semilla: number): Ladera {
     }
 
     const m = TIPOS[tipo];
-    y += entre(azar, min, max);
+    const subida = entre(azar, min, max);
+    y += subida;
     const ancho = tipo === 'descansillo' ? entre(azar, 3, 3.8) : entre(azar, m.ancho[0], m.ancho[1]);
-    const fondo = Math.min(entre(azar, m.fondo[0], m.fondo[1]), 2.6);
+    // Sale lo que se ha alejado la cara desde el anterior: su borde de fuera
+    // queda casi encima del de abajo y un salto de lado cae encima.
+    const fondo = Math.min(Math.min(entre(azar, m.fondo[0], m.fondo[1]), 2.6) + subida * PENDIENTE, FONDO_MAX);
     const grosor = entre(azar, m.grosor[0], m.grosor[1]);
 
     let u: number;
@@ -207,10 +250,12 @@ export function alturaSueloLadera(l: Ladera, x: number, z: number, techo: number
   if (enPasillo(d, u) || (r >= RADIO_COLINA - margen && r <= RADIO_MUNDO)) mejor = l.base;
   // Lo alto de la colina (alrededor del agujero del pozo).
   if (ALTO_COLINA <= techo && r >= RADIO_PARED && r <= RADIO_COLINA + margen) mejor = Math.max(mejor, ALTO_COLINA);
-  // La cima: desde el borde de la cara hacia dentro de la montaña.
-  if (l.rellano <= techo && d >= dCara(l.rellano) - FONDO_CIMA - margen && Math.abs(u) <= ANCHO_CIMA / 2 + margen) mejor = Math.max(mejor, l.rellano);
+  // La cima: desde el borde de la cara hacia dentro, por todo lo alto de la cara (el pico la cierra por detrás).
+  if (l.rellano <= techo && d >= dCara(l.rellano) - FONDO_CIMA - margen && Math.abs(u) <= ANCHO_CARA / 2 && r <= RADIO_MUNDO) mejor = Math.max(mejor, l.rellano);
   for (const s of l.salientes) {
-    if (s.y <= techo && s.y > mejor && sobreSalienteLadera(s, d, u, margen)) mejor = s.y;
+    if (!sobreSalienteLadera(s, d, u, margen)) continue;
+    const h = alturaEnSaliente(s, d);
+    if (h <= techo && h > mejor) mejor = h;
   }
   return mejor;
 }
@@ -279,7 +324,22 @@ export function limiteMundo(l: Ladera): Limite {
       return { nx: -nx, nz: -nz };
     }
 
-    // 3 · Fuera: no meterse en la cara de la montaña.
+    // 3 · En la cima ya no hay cara delante: se anda hacia dentro hasta el pico.
+    if (y >= l.rellano - 0.3 && r >= RADIO_COLINA) {
+      const pico = centroPico(l);
+      const dx = p.x - pico.x;
+      const dz = p.z - pico.z;
+      const lejos = Math.hypot(dx, dz);
+      const minimo = PICO.radio + RADIO_CUERPO;
+      if (lejos < minimo && lejos > 1e-9) {
+        p.x = pico.x + (dx / lejos) * minimo;
+        p.z = pico.z + (dz / lejos) * minimo;
+        return { nx: -dx / lejos, nz: -dz / lejos };
+      }
+      return r > RADIO_MUNDO ? dentroDeCirculo(p, RADIO_MUNDO) : null;
+    }
+
+    // 4 · Fuera: no meterse en la cara de la montaña.
     const max = dCara(y) - RADIO_CUERPO;
     if (r >= RADIO_COLINA && d > max) {
       const corregido = aMundo(l, max, u);
@@ -287,7 +347,7 @@ export function limiteMundo(l: Ladera): Limite {
       p.z = corregido.z;
       return { nx: e.nx, nz: e.nz };
     }
-    // 4 · Y no irse lejísimos.
+    // 5 · Y no irse lejísimos.
     if (r > RADIO_MUNDO) return dentroDeCirculo(p, RADIO_MUNDO);
     return null;
   };
@@ -326,4 +386,23 @@ export function acortarFuera(l: Ladera, m: { x: number; y: number; z: number }, 
 /** Dónde se aparece al empezar en la ladera (`?altura=440`): en la explanada, delante del pasillo. */
 export function salidaLadera(l: Ladera): { x: number; z: number } {
   return aMundo(l, RADIO_COLINA + 3, 0);
+}
+
+/* ---------- Los crampones ---------- */
+
+/**
+ * ¿Lleva puestos los crampones (pinchos en las botas para el hielo)? Se los
+ * pone al pasar por delante del soporte del pasillo, justo antes de salir a la
+ * nieve (o si ya está fuera), y se los quita si vuelve a la roca del pozo.
+ * Entre el pozo y el soporte se queda como estaba (`antes`): así no se los
+ * pone y se los quita una y otra vez si se para justo delante.
+ */
+export function conCrampones(l: Ladera, x: number, y: number, z: number, antes: boolean): boolean {
+  if (y < l.base - 1) return false;
+  const r = Math.hypot(x, z);
+  if (r >= RADIO_COLINA || y >= ALTO_COLINA - 0.5) return true;
+  const { d, u } = aLocal(l, x, z);
+  if (enPasillo(d, u) && d >= CRAMPONES.d) return true;
+  if (r < RADIO_PARED) return false;
+  return antes;
 }

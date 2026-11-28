@@ -33,6 +33,8 @@ export const SONIDOS = [
   'victoria',
   'finCarrera',
   'gota',
+  'crampones',
+  'pasoNieve',
 ] as const;
 
 export type Sonido = (typeof SONIDOS)[number];
@@ -66,6 +68,7 @@ export function sonidosDelPaso(o: Oido, r: PasoCorredor, e: Escalador, paso: num
   const s = r.sucesos;
 
   if (r.reaparecio) tocar('reaparecer');
+  if (r.crampones) tocar('crampones');
   if (s.dobleSalto) tocar('dobleSalto');
   else if (s.salto) tocar('salto');
   if (s.agarre) tocar('agarre');
@@ -86,7 +89,7 @@ export function sonidosDelPaso(o: Oido, r: PasoCorredor, e: Escalador, paso: num
     o.recorrido += Math.hypot(e.vx, e.vz) * paso;
     if (o.recorrido >= S.zancada) {
       o.recorrido -= S.zancada;
-      tocar('paso', limitar(Math.hypot(e.vx, e.vz) / CONFIG.escalador.velocidad));
+      tocar(e.crampones ? 'pasoNieve' : 'paso', limitar(Math.hypot(e.vx, e.vz) / CONFIG.escalador.velocidad));
     }
   } else {
     o.recorrido = ARRANQUE;

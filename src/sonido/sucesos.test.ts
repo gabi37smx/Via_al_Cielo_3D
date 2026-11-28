@@ -8,7 +8,7 @@ import { crearOido, sonidosDelPaso } from './sucesos.ts';
 const PASO = 1 / 60;
 
 function resultado(cambios: Partial<PasoCorredor['sucesos']> = {}, jugadas: Jugada[] = [], extra: Partial<PasoCorredor> = {}): PasoCorredor {
-  return { sucesos: { salto: false, dobleSalto: false, aterrizaje: 0, agarre: false, ...cambios }, jugadas, llego: false, reaparecio: false, ...extra };
+  return { sucesos: { salto: false, dobleSalto: false, aterrizaje: 0, agarre: false, ...cambios }, jugadas, llego: false, reaparecio: false, crampones: false, ...extra };
 }
 
 function escalador(cambios: Partial<Escalador> = {}): Escalador {
@@ -60,6 +60,15 @@ describe('qué suena en cada paso', () => {
 
   it('reaparecer suena', () => {
     expect(nombres(sonidosDelPaso(crearOido(), resultado({}, [], { reaparecio: true }), escalador(), PASO))).toEqual(['reaparecer']);
+  });
+
+  it('al ponerse los crampones, su clic; y con ellos los pasos crujen en la nieve', () => {
+    expect(nombres(sonidosDelPaso(crearOido(), resultado({}, [], { crampones: true }), escalador(), PASO))).toEqual(['crampones']);
+    const oido = crearOido();
+    const e = escalador({ postura: 'corriendo', vx: 6, crampones: true });
+    const oidos = Array.from({ length: 60 }, () => nombres(sonidosDelPaso(oido, resultado(), e, PASO))).flat();
+    expect(oidos.length).toBeGreaterThan(0);
+    expect(new Set(oidos)).toEqual(new Set(['pasoNieve']));
   });
 
   it('corriendo, un paso cada zancada (más deprisa, más pasos)', () => {

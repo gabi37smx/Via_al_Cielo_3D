@@ -9,6 +9,8 @@
  * - No puede meterse en la roca (la pared del pozo, o en la ladera el
  *   pasillo, la colina y la montaña: `Limite`): se desliza por ella.
  * - Se agarra al borde de un saliente si se queda corto y trepa (idea I3).
+ * - En una cuesta de hielo (los salientes de la montaña, decisión 041) se
+ *   desliza cuesta abajo, hacia la pared; con crampones, menos.
  */
 import { CONFIG } from '../config.ts';
 import { limitePozo, type Limite } from '../reglas/ladera.ts';
@@ -73,6 +75,8 @@ export interface Escalador {
   trepar: number;
   /** Tiempo que le queda sin poder agarrarse (justo después de soltarse). */
   sinAgarre: number;
+  /** Lleva los crampones puestos (los pone reglas/ladera.ts al salir a la nieve). */
+  crampones: boolean;
   postura: Postura;
 }
 
@@ -99,6 +103,7 @@ export function crearEscalador(x: number, y: number, z: number): Escalador {
     agarre: null,
     trepar: 0,
     sinAgarre: 0,
+    crampones: false,
     postura: 'quieto',
   };
 }
@@ -132,12 +137,15 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   }
   e.sinAgarre = Math.max(e.sinAgarre - paso, 0);
 
-  // 2 · Velocidad horizontal: acelera hacia la deseada, frena al soltar.
+  // 2 · Velocidad horizontal: acelera hacia la deseada, frena al soltar. En
+  //     una cuesta de hielo, la deseada lleva además el deslizamiento.
   const quiere = largo > 0.01;
   const control = e.enSuelo ? 1 : C.controlAire;
   const cambio = (quiere ? C.aceleracion : C.frenado) * control * paso;
-  const objetivoX = dx * C.velocidad;
-  const objetivoZ = dz * C.velocidad;
+  const deriva = e.enSuelo ? deslizamiento(e, suelo) : { x: 0, z: 0 };
+  const deslizando = !quiere && Math.hypot(deriva.x, deriva.z) > 0.01;
+  const objetivoX = dx * C.velocidad + deriva.x;
+  const objetivoZ = dz * C.velocidad + deriva.z;
   // Se acerca como vector (no eje a eje) para que la diagonal frene igual.
   const ddx = objetivoX - e.vx;
   const ddz = objetivoZ - e.vz;
@@ -151,7 +159,8 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   }
 
   // 3 · Girarse hacia donde va.
-  const rapidez = Math.hypot(e.vx, e.vz);
+  //     Deslizándose sin pulsar nada no se gira: resbala tal como está.
+  const rapidez = deslizando ? 0 : Math.hypot(e.vx, e.vz);
   if (rapidez > 0.5) {
     const deseada = Math.atan2(e.vx, e.vz);
     let giro = deseada - e.orientacion;
@@ -201,11 +210,13 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
 
   // 7 · Moverse en vertical. Al bajar, el suelo que cuenta es el que estaba
   //     por debajo de los pies ANTES de moverse: así no se cuela ni cayendo rápido.
+  //     Bajando una cuesta se queda pegado al suelo (si no, iría a saltitos).
   const yAntes = e.y;
   const yNueva = e.y + e.vy * paso;
   if (e.vy <= 0) {
     const s = suelo(e.x, e.z, e.y + 0.05);
-    if (yNueva <= s) {
+    const pegado = e.enSuelo && e.y - s <= C.pegarseAlSuelo;
+    if (yNueva <= s || pegado) {
       if (!e.enSuelo) sucesos.aterrizaje = Math.max(e.alturaMaxima - s, 0);
       e.y = s;
       e.vy = 0;
@@ -235,6 +246,36 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
     : e.voltereta > 0 ? 'dobleSalto' : e.vy > 0 ? 'subiendo' : 'cayendo';
 
   return sucesos;
+}
+
+/**
+ * Cuesta del suelo bajo los pies (m de subida por m, en x y en z): se mira el
+ * suelo a 10 cm a cada lado. Un escalón (más de 45°) no es cuesta: si un lado
+ * cae fuera del saliente, se usa solo el otro.
+ */
+export function cuesta(suelo: Suelo, x: number, z: number, y: number): { x: number; z: number } {
+  const E = 0.1;
+  const techo = y + 0.05 + E;
+  const h = suelo(x, z, techo);
+  if (!Number.isFinite(h)) return { x: 0, z: 0 };
+  const vale = (v: number) => Number.isFinite(v) && Math.abs(v - h) < E;
+  const eje = (mas: number, menos: number) => {
+    if (vale(mas) && vale(menos)) return (mas - menos) / (2 * E);
+    if (vale(mas)) return (mas - h) / E;
+    if (vale(menos)) return (h - menos) / E;
+    return 0;
+  };
+  return {
+    x: eje(suelo(x + E, z, techo), suelo(x - E, z, techo)),
+    z: eje(suelo(x, z + E, techo), suelo(x, z - E, techo)),
+  };
+}
+
+/** Velocidad a la que le lleva el hielo cuesta abajo (m/s, en x y en z). Las únicas cuestas son de hielo. */
+function deslizamiento(e: Escalador, suelo: Suelo): { x: number; z: number } {
+  const c = cuesta(suelo, e.x, e.z, e.y);
+  const f = C.deslizarHielo * (e.crampones ? C.deslizarConCrampones : 1);
+  return { x: -c.x * f, z: -c.z * f };
 }
 
 /** Curva suave de 0 a 1 (arranca y llega despacio). */

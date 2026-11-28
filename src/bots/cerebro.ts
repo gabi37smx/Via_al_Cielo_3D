@@ -54,7 +54,8 @@ export function siguienteObjetivoLadera(e: Escalador, l: Ladera, apoyo: number):
     return { ...aMundo(l, dCara(s.y) - Math.min(0.9, s.fondo - 0.4), u), y: s.y };
   }
   const u = Math.min(Math.max(yo.u, -ANCHO_CIMA / 2 + 1), ANCHO_CIMA / 2 - 1);
-  return { ...aMundo(l, dCara(l.rellano) - 1.5, u), y: l.rellano };
+  // Justo pasado el borde: desde la pared del último saliente queda a menos de DISTANCIA_SALTO.
+  return { ...aMundo(l, dCara(l.rellano) + 0.5, u), y: l.rellano };
 }
 
 /** Dónde ir a continuación (según dónde está y el último sitio pisado). */
