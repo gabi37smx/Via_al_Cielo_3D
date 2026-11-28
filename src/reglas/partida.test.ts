@@ -106,11 +106,11 @@ describe('murciélagos', () => {
   it('un golpe quita 10 y deja 1,5 s invulnerable', () => {
     const p = crearPartida();
     const mundo = { fragmentos: [], murcielagos: [quieto] };
-    expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([{ tipo: 'golpe', danio: 10 }]);
+    expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([{ tipo: 'golpe', danio: 10, animal: 'murcielago' }]);
     expect(p.vida).toBe(90);
     // Durante 1,5 s no vuelve a golpear aunque siga encima.
     for (let i = 0; i < 89; i++) expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([]);
-    expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([{ tipo: 'golpe', danio: 10 }]);
+    expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([{ tipo: 'golpe', danio: 10, animal: 'murcielago' }]);
     expect(p.vida).toBe(80);
   });
 
@@ -125,7 +125,7 @@ describe('fin de partida', () => {
     const p = crearPartida();
     p.vida = 10;
     const mundo = { fragmentos: [], murcielagos: [quieto] };
-    expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([{ tipo: 'golpe', danio: 10 }, { tipo: 'fin' }]);
+    expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([{ tipo: 'golpe', danio: 10, animal: 'murcielago' }, { tipo: 'fin' }]);
     expect(p.terminada).toBe(true);
     expect(pasoPartida(p, en(5, 10, 0), mundo, PASO)).toEqual([]);
   });

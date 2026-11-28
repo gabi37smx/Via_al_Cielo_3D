@@ -21,9 +21,9 @@ src/
   config.ts  TODOS los números que se ajustan jugando (velocidades, saltos, cámara…)
   nucleo/    bucle de paso fijo, entrada (teclado/ratón/mando → una misma estructura)
   jugador/   control.ts (movimiento, LÓGICA PURA) y personaje.ts (dibujo y animación)
-  reglas/    torre (el pozo), ladera (la montaña y el límite del mundo), partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
+  reglas/    torre (el pozo), ladera (la montaña y el límite del mundo), aire (águilas y viento), partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
   bots/      cerebro del escalador del ordenador y simulación de partidas (lógica pura)
-  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts, grieta.ts, adornos.ts y montana.ts (Three.js)
+  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts, grieta.ts, adornos.ts, montana.ts y aire.ts (águilas, nieve y viento) (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
   red/       protocolo.ts e interpolacion.ts (LÓGICA PURA) y sala.ts (Supabase)
   sonido/    sucesos.ts (qué suena en cada paso, LÓGICA PURA), sintetizador.ts (cómo suena, Web Audio) y audio.ts (volumen, M, fondo)
@@ -48,7 +48,7 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm test` | Pasar las pruebas |
 | `npm run build` | Comprobar tipos y generar `dist/` para publicar |
 | `npm run captura` | **Ver el juego**: abre Chromium sin pantalla y deja `capturas/captura.png`. Opciones: `--salida`, `--ancho`, `--alto`, `--espera` (ms), `--ruta` (por defecto `"?semilla=1&panel=1"`) y `--teclas` (pulsar antes de capturar: `"Space:60,_:400,Space:60"` = doble salto; `_` espera) |
-| `npm run simular` | Simula subidas de la cueva con el escalador del ordenador y enseña una tabla (`npm run simular -- 50 20`: 50 torres, 20 murciélagos; `npm run simular -- 20 - 2`: la grieta, tramo 2, con sus murciélagos; `-- 20 - 3`: la ladera de la montaña). **Después de tocar números de `config.ts` o `REGLAS`, simula** |
+| `npm run simular` | Simula subidas de la cueva con el escalador del ordenador y enseña una tabla (`npm run simular -- 50 20`: 50 torres, 20 murciélagos; `npm run simular -- 20 - 2`: la grieta, tramo 2, con sus murciélagos; `-- 20 - 3`: la ladera de la montaña, con sus 22 águilas y el viento; `-- 20 30 3`: con 30 águilas). **Después de tocar números de `config.ts` o `REGLAS`, simula** |
 | `npm run prueba-red` | **Prueba con dos navegadores** contra Supabase (Ana con la escaladora y Beto con el escalador): se ven, misma semilla, anfitrión, cada uno ve al otro con su aspecto, posición del rival, **una carrera entera** (salida, llegadas, fin y ganador) y relevo del anfitrión. Tarda ~2 minutos. Deja `capturas/red-ana.png`, `capturas/red-beto.png` y `capturas/red-carrera.png`. Necesita el `.env` |
 | `npm run sonidos` | Graba cada sonido del juego en `capturas/sonidos/*.wav` (con el mismo código del juego) y enseña su duración, pico y volumen. Falla si alguno sale mudo, saturado o cortado. **Después de tocar `src/sonido/sintetizador.ts`, pásalo** (la IA no puede oír: lo mide) |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |

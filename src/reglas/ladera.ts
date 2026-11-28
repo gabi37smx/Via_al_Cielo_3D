@@ -100,6 +100,8 @@ export interface Ladera {
   rellano: number;
   /** Ángulo del pasillo alrededor del pozo (rad): de él salen d y u. */
   angulo: number;
+  /** La semilla de la partida: de ella salen también las águilas y las ráfagas (reglas/aire.ts). */
+  semilla: number;
   salientes: SalienteLadera[];
 }
 
@@ -226,7 +228,7 @@ export function generarLadera(semilla: number): Ladera {
     anterior = s;
   }
 
-  return { indice: INDICE_LADERA, base: BASE_LADERA, rellano: CIMA, angulo, salientes };
+  return { indice: INDICE_LADERA, base: BASE_LADERA, rellano: CIMA, angulo, semilla, salientes };
 }
 
 /* ---------- Dónde se pisa ---------- */

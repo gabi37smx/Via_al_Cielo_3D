@@ -11,6 +11,7 @@
 import { crearAzar, derivarSemilla, entre } from './azar.ts';
 import { RADIO_PARED, puntoEnAngulo, type Tramo } from './torre.ts';
 import { aMundo, dCara, type Ladera } from './ladera.ts';
+import { AIRE, posicionAguila, type Aguila } from './aire.ts';
 
 export const REGLAS = {
   vidaInicial: 100,
@@ -155,7 +156,7 @@ export interface Partida {
 export type Jugada =
   | { tipo: 'fragmento'; id: number; enTramo: number }
   | { tipo: 'vidaExtra'; cantidad: number }
-  | { tipo: 'golpe'; danio: number }
+  | { tipo: 'golpe'; danio: number; animal: 'murcielago' | 'aguila' }
   | { tipo: 'caida'; metros: number; danio: number }
   | { tipo: 'fin' };
 
@@ -168,6 +169,8 @@ export interface Situacion extends Punto {
 export interface Peligros {
   fragmentos: Fragmento[];
   murcielagos: Murcielago[];
+  /** Las águilas de la montaña (reglas/aire.ts); sin ellas, ninguna. */
+  aguilas?: Aguila[];
 }
 
 export function crearPartida(): Partida {
@@ -228,7 +231,21 @@ export function pasoPartida(p: Partida, s: Situacion, mundo: Peligros, paso: num
         danar(p, REGLAS.danioMurcielago);
         p.invulnerable = REGLAS.invulnerabilidad;
         p.golpes++;
-        jugadas.push({ tipo: 'golpe', danio: REGLAS.danioMurcielago });
+        jugadas.push({ tipo: 'golpe', danio: REGLAS.danioMurcielago, animal: 'murcielago' });
+        break;
+      }
+    }
+  }
+
+  // Águilas: igual, pero quitan más (15, como en el 2D).
+  if (p.invulnerable === 0) {
+    for (const a of mundo.aguilas ?? []) {
+      if (Math.abs(a.y - cuerpo.y) > 3) continue;
+      if (distancia(cuerpo, posicionAguila(a, p.tiempo)) <= AIRE.radioGolpeAguila) {
+        danar(p, AIRE.danioAguila);
+        p.invulnerable = REGLAS.invulnerabilidad;
+        p.golpes++;
+        jugadas.push({ tipo: 'golpe', danio: AIRE.danioAguila, animal: 'aguila' });
         break;
       }
     }

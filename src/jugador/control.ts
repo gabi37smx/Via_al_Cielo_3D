@@ -11,6 +11,8 @@
  * - Se agarra al borde de un saliente si se queda corto y trepa (idea I3).
  * - En una cuesta de hielo (los salientes de la montaña, decisión 041) se
  *   desliza cuesta abajo, hacia la pared; con crampones, menos.
+ * - En el aire, el viento (las ráfagas de la montaña, decisión 042) lo lleva
+ *   de lado; de pie no se nota.
  */
 import { CONFIG } from '../config.ts';
 import { limitePozo, type Limite } from '../reglas/ladera.ts';
@@ -114,7 +116,18 @@ function acercar(actual: number, objetivo: number, max: number): number {
   return Math.abs(d) <= max ? objetivo : actual + Math.sign(d) * max;
 }
 
-export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: number, limite: Limite = limitePozo): Sucesos {
+/** Sin viento (dentro de la cueva). */
+const SIN_VIENTO = { x: 0, z: 0 };
+
+/** `viento`: velocidad del aire donde está (m/s); solo cuenta en el aire. */
+export function pasoEscalador(
+  e: Escalador,
+  o: Ordenes,
+  suelo: Suelo,
+  paso: number,
+  limite: Limite = limitePozo,
+  viento: { x: number; z: number } = SIN_VIENTO,
+): Sucesos {
   const sucesos: Sucesos = { salto: false, dobleSalto: false, aterrizaje: 0, agarre: false };
 
   // 1 · Dirección deseada, relativa a la cámara. La cámara está en
@@ -138,12 +151,13 @@ export function pasoEscalador(e: Escalador, o: Ordenes, suelo: Suelo, paso: numb
   e.sinAgarre = Math.max(e.sinAgarre - paso, 0);
 
   // 2 · Velocidad horizontal: acelera hacia la deseada, frena al soltar. En
-  //     una cuesta de hielo, la deseada lleva además el deslizamiento.
+  //     una cuesta de hielo, la deseada lleva además el deslizamiento; en el
+  //     aire, el viento (como una corriente: sin pulsar, se va con ella).
   const quiere = largo > 0.01;
   const control = e.enSuelo ? 1 : C.controlAire;
   const cambio = (quiere ? C.aceleracion : C.frenado) * control * paso;
-  const deriva = e.enSuelo ? deslizamiento(e, suelo) : { x: 0, z: 0 };
-  const deslizando = !quiere && Math.hypot(deriva.x, deriva.z) > 0.01;
+  const deriva = e.enSuelo ? deslizamiento(e, suelo) : viento;
+  const deslizando = e.enSuelo && !quiere && Math.hypot(deriva.x, deriva.z) > 0.01;
   const objetivoX = dx * C.velocidad + deriva.x;
   const objetivoZ = dz * C.velocidad + deriva.z;
   // Se acerca como vector (no eje a eje) para que la diagonal frene igual.

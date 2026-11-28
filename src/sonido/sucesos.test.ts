@@ -8,7 +8,7 @@ import { crearOido, sonidosDelPaso } from './sucesos.ts';
 const PASO = 1 / 60;
 
 function resultado(cambios: Partial<PasoCorredor['sucesos']> = {}, jugadas: Jugada[] = [], extra: Partial<PasoCorredor> = {}): PasoCorredor {
-  return { sucesos: { salto: false, dobleSalto: false, aterrizaje: 0, agarre: false, ...cambios }, jugadas, llego: false, reaparecio: false, crampones: false, ...extra };
+  return { sucesos: { salto: false, dobleSalto: false, aterrizaje: 0, agarre: false, ...cambios }, jugadas, llego: false, reaparecio: false, crampones: false, rafaga: false, ...extra };
 }
 
 function escalador(cambios: Partial<Escalador> = {}): Escalador {
@@ -45,7 +45,7 @@ describe('qué suena en cada paso', () => {
     const jugadas: Jugada[] = [
       { tipo: 'fragmento', id: 1, enTramo: 1 },
       { tipo: 'vidaExtra', cantidad: 10 },
-      { tipo: 'golpe', danio: 15 },
+      { tipo: 'golpe', danio: 15, animal: 'murcielago' },
       { tipo: 'fin' },
     ];
     expect(nombres(sonidosDelPaso(crearOido(), resultado({}, jugadas), escalador(), PASO))).toEqual(['fragmento', 'vidaExtra', 'golpe', 'derrota']);
@@ -60,6 +60,13 @@ describe('qué suena en cada paso', () => {
 
   it('reaparecer suena', () => {
     expect(nombres(sonidosDelPaso(crearOido(), resultado({}, [], { reaparecio: true }), escalador(), PASO))).toEqual(['reaparecer']);
+  });
+
+  it('un águila que golpea suena a golpe y además chilla; una ráfaga, su soplido', () => {
+    const golpe = (animal: 'murcielago' | 'aguila'): Jugada => ({ tipo: 'golpe', danio: 10, animal });
+    expect(nombres(sonidosDelPaso(crearOido(), resultado({}, [golpe('murcielago')]), escalador(), PASO))).toEqual(['golpe']);
+    expect(nombres(sonidosDelPaso(crearOido(), resultado({}, [golpe('aguila')]), escalador(), PASO))).toEqual(['golpe', 'graznido']);
+    expect(nombres(sonidosDelPaso(crearOido(), resultado({}, [], { rafaga: true }), escalador(), PASO))).toEqual(['rafaga']);
   });
 
   it('al ponerse los crampones, su clic; y con ellos los pasos crujen en la nieve', () => {
