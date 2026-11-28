@@ -132,6 +132,8 @@ export const DURACION: Record<Sonido, number> = {
   pasoNieve: 0.12,
   graznido: 0.55,
   rafaga: 2.7,
+  puerta: 0.35,
+  ruedas: 0.6,
 };
 
 /**
@@ -264,6 +266,19 @@ export function tocar(ctx: Contexto, destino: AudioNode, sonido: Sonido, t0: num
       soplo(ctx, destino, { filtro: 'bandpass', desde: 350, hasta: 900, q: 0.8, t0, dur: 2.5, vol: 0.32, ataque: 0.9 });
       soplo(ctx, destino, { filtro: 'bandpass', desde: 1800, hasta: 2600, q: 6, t0: t0 + 0.3, dur: 2, vol: 0.07, ataque: 0.7 });
       break;
+    case 'puerta':
+      // La puerta de la avioneta al cerrarse: un golpe hueco de chapa y el pestillo.
+      soplo(ctx, destino, { filtro: 'lowpass', desde: 900, hasta: 160, t0, dur: 0.16, vol: 0.5 });
+      tono(ctx, destino, { forma: 'triangle', desde: 190 * v, hasta: 120 * v, t0, dur: 0.14, vol: 0.25 });
+      soplo(ctx, destino, { filtro: 'bandpass', desde: 3200, q: 4, t0: t0 + 0.13, dur: 0.05, vol: 0.18 });
+      tono(ctx, destino, { forma: 'square', desde: 2100 * v, t0: t0 + 0.13, dur: 0.04, vol: 0.03, ataque: 0.001 });
+      break;
+    case 'ruedas':
+      // Las ruedas al tocar la pista: un chirrido corto de goma y el golpe del tren.
+      soplo(ctx, destino, { filtro: 'bandpass', desde: 2400, hasta: 1500, q: 7, t0, dur: 0.45, vol: 0.2, ataque: 0.01 });
+      tono(ctx, destino, { forma: 'sawtooth', desde: 1150 * v, hasta: 800 * v, t0, dur: 0.35, vol: 0.025, ataque: 0.01 });
+      soplo(ctx, destino, { filtro: 'lowpass', desde: 400, hasta: 90, t0, dur: 0.22, vol: 0.4 });
+      break;
     case 'gota': {
       // Gota de agua en la cueva y su eco.
       const f = 1500 * v;
@@ -272,6 +287,69 @@ export function tocar(ctx: Contexto, destino: AudioNode, sonido: Sonido, t0: num
       break;
     }
   }
+}
+
+/**
+ * El motor de la avioneta (idea I9): un zumbido grave (dos dientes de sierra
+ * casi iguales que «baten») con el golpeteo de la helice y un soplido de aire.
+ * `potencia` (0-1) sube el tono, el volumen y el golpeteo; con 0 se calla.
+ */
+export function crearMotor(ctx: Contexto, destino: AudioNode): { potencia(p: number, t: number): void; parar(t: number): void } {
+  const salida = ctx.createGain();
+  salida.gain.value = 0;
+  salida.connect(destino);
+  const filtro = ctx.createBiquadFilter();
+  filtro.type = 'lowpass';
+  filtro.frequency.value = 500;
+  filtro.Q.value = 0.7;
+  // El golpeteo de la helice: el volumen sube y baja deprisa (dos palas por vuelta).
+  const golpe = ctx.createGain();
+  golpe.gain.value = 0.7;
+  const helice = ctx.createOscillator();
+  helice.type = 'sine';
+  helice.frequency.value = 18;
+  const cuanto = ctx.createGain();
+  cuanto.gain.value = 0.3;
+  helice.connect(cuanto).connect(golpe.gain);
+  filtro.connect(golpe).connect(salida);
+  const a = ctx.createOscillator();
+  const b = ctx.createOscillator();
+  a.type = b.type = 'sawtooth';
+  a.frequency.value = 70;
+  b.frequency.value = 71.3;
+  const mezcla = ctx.createGain();
+  mezcla.gain.value = 0.22;
+  a.connect(mezcla);
+  b.connect(mezcla);
+  mezcla.connect(filtro);
+  // El aire que mueve la helice.
+  const aire = ctx.createBufferSource();
+  aire.buffer = ruidoBlanco(ctx);
+  aire.loop = true;
+  const filtroAire = ctx.createBiquadFilter();
+  filtroAire.type = 'bandpass';
+  filtroAire.frequency.value = 700;
+  filtroAire.Q.value = 0.6;
+  const volAire = ctx.createGain();
+  volAire.gain.value = 0.05;
+  aire.connect(filtroAire).connect(volAire).connect(golpe);
+  const fuentes = [a, b, helice, aire];
+  for (const f of fuentes) f.start();
+  return {
+    potencia(p, t) {
+      const x = Math.min(Math.max(p, 0), 1);
+      a.frequency.setTargetAtTime(62 + 70 * x, t, 0.25);
+      b.frequency.setTargetAtTime(63.1 + 71 * x, t, 0.25);
+      helice.frequency.setTargetAtTime(12 + 34 * x, t, 0.25);
+      filtro.frequency.setTargetAtTime(380 + 900 * x, t, 0.25);
+      volAire.gain.setTargetAtTime(0.03 + 0.12 * x, t, 0.25);
+      salida.gain.setTargetAtTime(x > 0 ? 0.25 + 0.45 * x : 0, t, 0.2);
+    },
+    parar(t) {
+      salida.gain.setTargetAtTime(0, t, 0.08);
+      for (const f of fuentes) f.stop(t + 0.6);
+    },
+  };
 }
 
 /**

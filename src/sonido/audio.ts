@@ -8,7 +8,7 @@
  * antes, simplemente no suena (así no hay avisos en la consola).
  */
 import { CONFIG } from '../config.ts';
-import { crearAmbienteCueva, tocar } from './sintetizador.ts';
+import { crearAmbienteCueva, crearMotor, tocar } from './sintetizador.ts';
 import type { Sonido, Toque } from './sucesos.ts';
 
 const CLAVE = 'via-al-cielo-3d:sonido';
@@ -24,6 +24,9 @@ export function crearAudio() {
   let ambienteQuerido = false;
   let ambiente: ReturnType<typeof crearAmbienteCueva> | null = null;
   let ultimoFiltro: number = S.filtroCueva;
+  /** El motor de la avioneta: solo existe mientras suena. */
+  let motor: ReturnType<typeof crearMotor> | null = null;
+  let potenciaMotor = -1;
   const avisos = new Set<(silencio: boolean) => void>();
 
   const volumenMaestro = () => (silencio ? 0 : S.volumen * (enPausa ? S.enPausa : 1));
@@ -94,6 +97,23 @@ export function crearAudio() {
       if (!ambienteQuerido || enPausa) return;
       const gotas = S.gotasPorSegundo * (1 - grieta * 0.5) * (1 - exterior);
       if (Math.random() < gotas * Math.min(dt, 0.1)) sonar('gota', 0.4 + Math.random() * 0.6);
+    },
+    /**
+     * El motor de la avioneta (0-1): se crea al empezar a sonar y se quita
+     * al volver a 0. Solo manda al AudioContext los cambios que se oyen.
+     */
+    motor(potencia: number) {
+      if (!ctx || !efectos || ctx.state !== 'running') return;
+      if (potencia <= 0.001) {
+        if (motor) motor.parar(ctx.currentTime);
+        motor = null;
+        potenciaMotor = -1;
+        return;
+      }
+      if (!motor) motor = crearMotor(ctx, efectos);
+      if (Math.abs(potencia - potenciaMotor) < 0.01) return;
+      potenciaMotor = potencia;
+      motor.potencia(potencia, ctx.currentTime);
     },
     /** Pausa (solo): baja el volumen y no caen gotas. */
     pausar(si: boolean) {

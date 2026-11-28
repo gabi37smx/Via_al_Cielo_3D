@@ -16,6 +16,7 @@ import {
   posicionSaliente,
   puntoDeSalida,
   tramoEnAltura,
+  TRAMOS_MONTANA,
   type TipoSaliente,
 } from './torre.ts';
 
@@ -210,13 +211,19 @@ describe('generarTramo', () => {
     expect(alturaSueloTorre(tramos, 0, 0, 100)).toBe(alturaSuelo(cueva!, 0, 0, 100));
   });
 
-  it('tramoEnAltura: 0 en la cueva, 1 en la grieta y el último por encima', () => {
+  it('tramoEnAltura: 0 en la cueva, 1 en la grieta, 2 en la ladera (también en la cima) y 3 en Valencia', () => {
     expect(tramoEnAltura(0)).toBe(0);
     expect(tramoEnAltura(219.9)).toBe(0);
     expect(tramoEnAltura(220)).toBe(1);
     expect(tramoEnAltura(439)).toBe(1);
-    expect(tramoEnAltura(1000)).toBe(ESCENARIOS.length - 1);
+    expect(tramoEnAltura(500)).toBe(2);
+    // De pie en la cima (660 m) aún se está en la montaña: a Valencia se va en avioneta.
+    expect(tramoEnAltura(660)).toBe(TRAMOS_MONTANA - 1);
+    expect(tramoEnAltura(1000)).toBe(TRAMOS_MONTANA - 1);
     expect(tramoEnAltura(-5)).toBe(0);
+    expect(tramoEnAltura(660, true)).toBe(3);
+    expect(ESCENARIOS[3]).toBe('Valencia');
+    expect(tramoEnAltura(5000, true)).toBe(ESCENARIOS.length - 1);
   });
 
   it('un tramo tiene entre 73 y 110 salientes: ni un paseo ni eterno', () => {

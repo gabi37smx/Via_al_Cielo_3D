@@ -7,7 +7,8 @@
  *
  * Abre Chromium sin pantalla, toca cada sonido con el MISMO código del juego
  * (src/sonido/sintetizador.ts) en un OfflineAudioContext y deja
- * capturas/sonidos/<nombre>.wav (+ ambiente.wav, 6 s del fondo de la cueva).
+ * capturas/sonidos/<nombre>.wav (+ ambiente.wav, 6 s del fondo de la cueva, y
+ * motor.wav, 6 s del motor de la avioneta: arranca, despega, aterriza y se para).
  * Enseña una tabla con la duración, el pico y el volumen medio (RMS).
  * Falla si alguno no suena (pico < 0,02) o se satura (pico > 1).
  */
@@ -55,7 +56,7 @@ try {
   await pagina.goto(new URL('?', url).href);
 
   const grabaciones = await pagina.evaluate(async () => {
-    const { tocar, crearAmbienteCueva, DURACION } = await import('/src/sonido/sintetizador.ts');
+    const { tocar, crearAmbienteCueva, crearMotor, DURACION } = await import('/src/sonido/sintetizador.ts');
     const { SONIDOS } = await import('/src/sonido/sucesos.ts');
     const frecuencia = 44100;
     const grabar = async (segundos, poner) => {
@@ -68,6 +69,19 @@ try {
       salida.push({ nombre: s, duracion: DURACION[s], muestras: await grabar(DURACION[s], (ctx) => tocar(ctx, ctx.destination, s, 0, 1, 0.5)) });
     }
     salida.push({ nombre: 'ambiente', duracion: 6, muestras: await grabar(6, (ctx) => crearAmbienteCueva(ctx, ctx.destination)) });
+    // El motor de la avioneta: arranca, a tope (despegue), aterrizaje y se para.
+    salida.push({
+      nombre: 'motor',
+      duracion: 6,
+      muestras: await grabar(6, (ctx) => {
+        const m = crearMotor(ctx, ctx.destination);
+        m.potencia(0.35, 0);
+        m.potencia(1, 1.2);
+        m.potencia(0.55, 3.5);
+        m.potencia(0.12, 4.6);
+        m.parar(5.2);
+      }),
+    });
     return { frecuencia, salida };
   });
 
@@ -79,7 +93,7 @@ try {
     // ¿Se apaga antes de acabar la grabación? (si no, el sonido se corta)
     const cola = g.muestras.slice(-Math.floor(grabaciones.frecuencia * 0.02));
     const picoCola = cola.reduce((m, x) => Math.max(m, Math.abs(x)), 0);
-    const problema = pico < 0.02 ? 'NO SUENA' : pico > 1 ? 'SATURA' : g.nombre !== 'ambiente' && picoCola > 0.01 ? 'SE CORTA' : '';
+    const problema = pico < 0.02 ? 'NO SUENA' : pico > 1 ? 'SATURA' : !['ambiente'].includes(g.nombre) && picoCola > 0.01 ? 'SE CORTA' : '';
     if (problema) fallos++;
     filas.push({ sonido: g.nombre, 's': g.duracion, pico: pico.toFixed(2), rms: rms.toFixed(3), problema });
     await writeFile(resolve(carpeta, `${g.nombre}.wav`), wav(g.muestras, grabaciones.frecuencia));

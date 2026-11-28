@@ -22,6 +22,8 @@ export const AMBIENTES = {
   grieta: { fondo: 0x7a6f62, niebla: 0.017, cielo: 0xf4ece0, sueloLuz: 0x6a5b4a, relleno: 1.9, sol: 0xfff2e0, intensidadSol: 3.3, linterna: 12 },
   /** Aire libre: cielo azul, nieve que refleja luz, niebla muy fina (se ve muy lejos), sin linterna. */
   exterior: { fondo: 0xcfe3f2, niebla: 0.0032, cielo: 0xcfe8ff, sueloLuz: 0xe6edf4, relleno: 1.5, sol: 0xfff8ec, intensidadSol: 3.4, linterna: 0 },
+  /** Valencia: sol mediterráneo más cálido, el suelo devuelve luz verde y crema, y se ve lejos. */
+  valencia: { fondo: 0xe9e4d8, niebla: 0.0016, cielo: 0xd4e8fb, sueloLuz: 0xbdb48e, relleno: 1.35, sol: 0xfff0d6, intensidadSol: 3.6, linterna: 0 },
 } as const satisfies Record<string, Ambiente>;
 
 /** Metros por debajo y por encima del rellano de los 220 m en los que la cueva se convierte en grieta. */
@@ -56,8 +58,11 @@ export interface Escena {
   redimensionar(): void;
   /** Pinta. `foco`: dónde está el escalador (las luces le siguen). */
   pintar(foco: THREE.Vector3Like): void;
-  /** Mezcla la cueva (0) con la grieta (1) y, encima, con el aire libre (`exterior`, 0-1): fondo, niebla y luces. */
-  ambientar(mezcla: number, exterior?: number): void;
+  /**
+   * Mezcla la cueva (0) con la grieta (1), encima con el aire libre
+   * (`exterior`, 0-1) y encima con Valencia (`ciudad`, 0-1): fondo, niebla y luces.
+   */
+  ambientar(mezcla: number, exterior?: number, ciudad?: number): void;
   /** Fuera, el sol viene desde detrás de quien mira a la montaña: (nx, nz) = hacia la montaña. */
   orientarSol(nx: number, nz: number): void;
 }
@@ -143,18 +148,19 @@ export function crearEscena(lienzo: HTMLCanvasElement): Escena {
   const b = new THREE.Color();
   const mezclar = (desde: number, hasta: number, t: number) => desde + (hasta - desde) * t;
   let ultima = '';
-  /** Mezcla dos ambientes (o tres: cueva → grieta → exterior). */
-  function ambientar(mezcla: number, exterior = 0) {
+  /** Mezcla los ambientes en fila: cueva → grieta → exterior → Valencia. */
+  function ambientar(mezcla: number, exterior = 0, ciudad = 0) {
     const t = Math.min(Math.max(mezcla, 0), 1);
     const x = Math.min(Math.max(exterior, 0), 1);
-    const clave = `${t}|${x}`;
+    const v = Math.min(Math.max(ciudad, 0), 1);
+    const clave = `${t}|${x}|${v}`;
     if (clave === ultima) return;
     ultima = clave;
-    exteriorAhora = x;
-    const [c, g, f] = [AMBIENTES.cueva, AMBIENTES.grieta, AMBIENTES.exterior];
+    exteriorAhora = Math.max(x, v);
+    const [c, g, f, val] = [AMBIENTES.cueva, AMBIENTES.grieta, AMBIENTES.exterior, AMBIENTES.valencia];
     const color = (prop: 'fondo' | 'cielo' | 'sueloLuz' | 'sol', destino: THREE.Color) =>
-      destino.lerpColors(a.setHex(c[prop]), b.setHex(g[prop]), t).lerp(b.setHex(f[prop]), x);
-    const numero = (prop: 'niebla' | 'relleno' | 'intensidadSol' | 'linterna') => mezclar(mezclar(c[prop], g[prop], t), f[prop], x);
+      destino.lerpColors(a.setHex(c[prop]), b.setHex(g[prop]), t).lerp(b.setHex(f[prop]), x).lerp(b.setHex(val[prop]), v);
+    const numero = (prop: 'niebla' | 'relleno' | 'intensidadSol' | 'linterna') => mezclar(mezclar(mezclar(c[prop], g[prop], t), f[prop], x), val[prop], v);
     color('fondo', fondo);
     niebla.color.copy(fondo);
     niebla.density = numero('niebla');

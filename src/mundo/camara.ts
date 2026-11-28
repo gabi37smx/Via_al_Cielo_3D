@@ -48,6 +48,8 @@ export interface CamaraTerceraPersona {
   /** Hacia dónde mira (rad): la cámara está en (sin giro, cos giro) respecto al escalador. */
   readonly giro: number;
   girar(dGiro: number, dInclinacion: number): void;
+  /** Pone la cámara de golpe, sin el retardo de seguir (al aparecer en otro sitio, p. ej. al bajar de la avioneta). */
+  colocar(giro: number, inclinacion: number): void;
   /**
    * Llamar en cada paso de la lógica con la posición del escalador: si nadie
    * ha tocado la cámara en un rato, la vuelve poco a poco hacia la pared (o
@@ -77,6 +79,12 @@ export function crearCamaraTerceraPersona(camara: THREE.PerspectiveCamera, giroI
       if (dGiro !== 0 || dInclinacion !== 0) sinTocar = 0;
       giro += dGiro;
       inclinacion = Math.min(Math.max(inclinacion + dInclinacion, C.inclinacionMin), C.inclinacionMax);
+    },
+    colocar(nuevoGiro, nuevaInclinacion) {
+      giro = nuevoGiro;
+      inclinacion = Math.min(Math.max(nuevaInclinacion, C.inclinacionMin), C.inclinacionMax);
+      sinTocar = 0;
+      primera = true;
     },
     recolocar(x, z, paso, ideal, inclinacionIdeal) {
       sinTocar += paso;

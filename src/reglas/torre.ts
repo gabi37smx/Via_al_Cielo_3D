@@ -24,13 +24,23 @@ export const METROS_POR_TRAMO = 220;
  * Los tramos que hay, en orden (decisión 024: sin repetir escenario). El 2D
  * tenía 2 pantallas de cada cueva; aquí cada una es UN tramo de 220 m, porque
  * en 3D cada tramo ya son ~90 salientes y más de un minuto de subida. Los dos
- * primeros son el pozo (este archivo); el tercero, la ladera (ladera.ts).
+ * primeros son el pozo (este archivo); el tercero, la ladera (ladera.ts). De
+ * la cima se va en avioneta a Valencia (vuelo.ts y valencia.ts), el cuarto.
  */
-export const ESCENARIOS = ['La cueva', 'La grieta', 'Aire libre'] as const;
+export const ESCENARIOS = ['La cueva', 'La grieta', 'Aire libre', 'Valencia'] as const;
 
-/** En qué tramo se está a la altura `y` (0 = la cueva). Encima del último, el último. */
-export function tramoEnAltura(y: number): number {
-  return Math.min(Math.max(Math.floor(y / METROS_POR_TRAMO), 0), ESCENARIOS.length - 1);
+/** Los tramos de la montaña (cueva, grieta y ladera): de su cima se sigue en avioneta. */
+export const TRAMOS_MONTANA = 3;
+
+/**
+ * En qué tramo se está a la altura `y` (0 = la cueva). En la montaña, como
+ * mucho la ladera (de pie en la cima aún no se está en Valencia); en la
+ * ciudad (`enCiudad`), desde Valencia hasta el último.
+ */
+export function tramoEnAltura(y: number, enCiudad = false): number {
+  const t = Math.floor(y / METROS_POR_TRAMO);
+  const [min, max] = enCiudad ? [TRAMOS_MONTANA, ESCENARIOS.length - 1] : [0, TRAMOS_MONTANA - 1];
+  return Math.min(Math.max(t, min), max);
 }
 
 /**
