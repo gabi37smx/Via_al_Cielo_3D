@@ -13,6 +13,8 @@ import { PASO } from '../nucleo/bucle.ts';
 import type { Azar } from '../reglas/azar.ts';
 import { ANCHO_CIMA, aLocal, aMundo, dCara, type Ladera } from '../reglas/ladera.ts';
 import { RADIO_CAMINO, RADIO_PARED, puntoEnAngulo, type Tramo } from '../reglas/torre.ts';
+import { MIRADOR, PALAU, Z_MIRADOR, zInterior, type Palau } from '../reglas/palau.ts';
+import { aLocalValencia, aMundoValencia } from '../reglas/valencia.ts';
 
 /** Distancia horizontal (m) a la que salta hacia el siguiente saliente. */
 const DISTANCIA_SALTO = 2.6;
@@ -56,6 +58,27 @@ export function siguienteObjetivoLadera(e: Escalador, l: Ladera, apoyo: number):
   const u = Math.min(Math.max(yo.u, -ANCHO_CIMA / 2 + 1), ANCHO_CIMA / 2 - 1);
   // Justo pasado el borde: desde la pared del último saliente queda a menos de DISTANCIA_SALTO.
   return { ...aMundo(l, dCara(l.rellano) + 0.5, u), y: l.rellano };
+}
+
+/** Lo mismo en el Palau (Valencia): el punto más cercano del siguiente saliente, o el mirador. */
+export function siguienteObjetivoPalau(e: Escalador, p: Palau, apoyo: number): Objetivo {
+  const yo = aLocalValencia(e.x, e.z);
+  const s = p.salientes.find((x) => x.y > apoyo + 0.3);
+  if (s) {
+    const margen = Math.min(0.6, s.ancho / 2 - 0.1);
+    const u = Math.min(Math.max(yo.x, s.u - s.ancho / 2 + margen), s.u + s.ancho / 2 - margen);
+    // También hacia fuera, el punto más cercano: arriba la cáscara se mete
+    // mucho y, tras un giro, el siguiente saliente queda ENCIMA del
+    // descansillo; apuntando siempre a su parte de dentro (pegada a la
+    // cáscara) se quedaba empujando contra ella sin saltar nunca.
+    const dentro = zInterior(s) - 0.4;
+    const fuera = zInterior(s) - s.fondo + Math.min(0.6, s.fondo / 2 - 0.1);
+    const z = Math.min(Math.max(yo.z, fuera), dentro);
+    return { ...aMundoValencia(u, z), y: s.y };
+  }
+  const u = Math.min(Math.max(yo.x, PALAU.x - MIRADOR.largo / 2 + 1), PALAU.x + MIRADOR.largo / 2 - 1);
+  // Justo pasado el borde del mirador (por el lado de la subida).
+  return { ...aMundoValencia(u, -Z_MIRADOR + 0.6), y: p.rellano };
 }
 
 /** Dónde ir a continuación (según dónde está y el último sitio pisado). */

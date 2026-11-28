@@ -18,7 +18,10 @@ import { generarAguilas, viento } from '../reglas/aire.ts';
 import { INDICE_LADERA, alturaSueloLadera, conCrampones, generarLadera, limiteMundo, salidaLadera, type Ladera, type Limite } from '../reglas/ladera.ts';
 import { generarFragmentosLadera } from '../reglas/partida.ts';
 import { alturaSuelo, generarTramo, puntoDeSalida } from '../reglas/torre.ts';
-import { crearCerebro, siguienteObjetivoLadera, type Cerebro } from './cerebro.ts';
+import { crearCerebro, siguienteObjetivoLadera, siguienteObjetivoPalau, type Cerebro } from './cerebro.ts';
+import { INDICE_PALAU, SUELO_PALAU, generarFragmentosPalau, generarPalau, zInterior } from '../reglas/palau.ts';
+import { REGLAS } from '../reglas/partida.ts';
+import { aMundoValencia, alturaSueloValencia, limiteValencia } from '../reglas/valencia.ts';
 
 export interface ResultadoSimulacion {
   semilla: number;
@@ -39,7 +42,7 @@ export interface ResultadoSimulacion {
 }
 
 export interface OpcionesSimulacion {
-  /** Qué tramo se sube (0 = la cueva, 1 = la grieta). */
+  /** Qué tramo se sube (0 = la cueva, 1 = la grieta, 2 = la ladera, 3 = el Palau). */
   tramo?: number;
   /** Sin él, los del tramo (`murcielagosDelTramo`). En la ladera, son águilas (sin él, `AIRE.aguilas`). */
   murcielagos?: number;
@@ -61,6 +64,23 @@ interface Escenario {
 }
 
 function escenario(semilla: number, indice: number, murcielagos?: number): Escenario {
+  if (indice === INDICE_PALAU) {
+    // El Palau de les Arts (Valencia): se sale del suelo, delante del primer saliente, pasado el zócalo.
+    const p = generarPalau(semilla);
+    const s = p.salientes[0]!;
+    return {
+      base: SUELO_PALAU,
+      rellano: p.rellano,
+      suelo: (x, z, techo) => alturaSueloValencia(x, z, techo, p),
+      limite: limiteValencia,
+      peligros: {
+        fragmentos: generarFragmentosPalau(semilla, p, REGLAS.fragmentosPorTramo).map((f) => ({ ...f, ...aMundoValencia(f.x, f.z) })),
+        murcielagos: [],
+      },
+      salida: aMundoValencia(s.u, zInterior(s) - 9),
+      cerebro: crearCerebro((e, apoyo) => siguienteObjetivoPalau(e, p, apoyo)),
+    };
+  }
   if (indice === INDICE_LADERA) {
     const l = generarLadera(semilla);
     return {

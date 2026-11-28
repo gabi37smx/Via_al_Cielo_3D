@@ -35,7 +35,9 @@ import {
   SUELO_VALENCIA,
   type Rectangulo,
 } from '../reglas/valencia.ts';
-import { crearTexturaRoca, materialRoca } from './texturas.ts';
+import { crearTexturaRoca, crearTexturaTrencadis, materialRoca } from './texturas.ts';
+import { crearSubidaPalau } from './palau.ts';
+import { ELIPSOIDE_CASCARAS, ELIPSOIDE_CASCO, PHI_DELANTE, PHI_DETRAS, type Palau } from '../reglas/palau.ts';
 
 function juntar(piezas: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return mergeGeometries(piezas.map((g) => (g.index ? g.toNonIndexed() : g)));
@@ -62,44 +64,6 @@ function encima<T extends THREE.Material>(m: T, capa = 1): T {
 }
 
 /* ---------- Texturas pintadas ---------- */
-
-/** El trencadís: azulejo blanco roto en trozos irregulares, con las juntas grises. */
-function texturaTrencadis(): THREE.CanvasTexture {
-  const tam = 512;
-  const lienzo = document.createElement('canvas');
-  lienzo.width = lienzo.height = tam;
-  const ctx = lienzo.getContext('2d')!;
-  ctx.fillStyle = '#d3d8dc';
-  ctx.fillRect(0, 0, tam, tam);
-  const azar = crearAzar(4401);
-  // Trozos: polígonos de 5-7 lados alrededor de una rejilla torcida.
-  const CELDA = 32;
-  for (let y = -1; y <= tam / CELDA; y++) {
-    for (let x = -1; x <= tam / CELDA; x++) {
-      const cx = (x + 0.5 + entre(azar, -0.25, 0.25)) * CELDA;
-      const cy = (y + 0.5 + entre(azar, -0.25, 0.25)) * CELDA;
-      const lados = 5 + Math.floor(azar() * 3);
-      const tono = Math.floor(entre(azar, 236, 252));
-      ctx.fillStyle = `rgb(${tono},${tono},${Math.min(tono + 3, 255)})`;
-      ctx.beginPath();
-      for (let k = 0; k < lados; k++) {
-        const a = (k / lados) * Math.PI * 2 + entre(azar, -0.2, 0.2);
-        const r = CELDA * entre(azar, 0.42, 0.62);
-        const px = cx + Math.cos(a) * r;
-        const py = cy + Math.sin(a) * r;
-        if (k === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-  const t = new THREE.CanvasTexture(lienzo);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
-}
 
 /**
  * Fachada con ventanas: 4 × 4 casillas (una ventana por planta), la pared
@@ -444,54 +408,46 @@ function crearPalau(): THREE.Group {
   const grupo = new THREE.Group();
   grupo.name = 'palau';
   const P = PALAU;
-  /** Centro de las elipses: por encima del suelo (así el pie es casi tan ancho como lo más ancho). */
-  const CENTRO_Y = 30;
-  /** Una elipse de alto `ry` (desde CENTRO_Y) que en el suelo mide (rx, rz): sus radios de verdad. */
-  const radios = (rx: number, rz: number, ry: number) => {
-    const k = Math.sqrt(1 - (CENTRO_Y / ry) ** 2);
-    return { rx: rx / k, rz: rz / k, ry, k };
-  };
-  // El casco interior: un huevo de cristal azulado; su morro (en el suelo) es el frente.
-  // Más bajo que las cáscaras: por fuera manda el blanco y el cristal asoma por delante.
-  const rc = radios(P.casco.rx, P.casco.rz, 115);
-  // Paños de unos 5 × 5 m: la esfera da la vuelta (u) y sube (v) con la textura repetida.
+  // El casco interior: un huevo de cristal azulado, más bajo que las
+  // cáscaras; su morro (en el suelo) es el frente. Medidas: reglas/palau.ts.
   const cascoCristal = texturaCristal(4, 4, '#b8d0de', '#e6f0f5');
   cascoCristal.repeat.set(70, 16);
+  const E = ELIPSOIDE_CASCO;
   const casco = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 48, 24).scale(rc.rx, rc.ry, rc.rz).translate(P.x, CENTRO_Y, P.z),
+    new THREE.SphereGeometry(1, 48, 24).scale(E.rx, E.ry, E.rz).translate(P.x, P.centroY, P.z),
     new THREE.MeshStandardMaterial({ map: cascoCristal, emissive: 0x2a4352, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0 }),
   );
-  // Las cáscaras: trozos de una elipse mayor (arriba, a 220 m), una a cada
-  // lado, abiertas por delante (desde `cascaras.desde`) y un poco por detrás.
-  const rk = radios(P.cascaras.rx, P.cascaras.rz, P.alto - CENTRO_Y);
-  const thetaSuelo = Math.acos(-CENTRO_Y / rk.ry);
-  // En la esfera de Three.js x = −cos(φ)·sen(θ): el frente (−X) es φ pequeño.
-  const phiDelante = Math.acos((P.x - P.cascaras.desde) / P.cascaras.rx);
-  const phiDetras = 0.9 * Math.PI;
+  // Las cáscaras: trozos de un elipsoide mayor (arriba, a 220 m), una a cada
+  // lado, abiertas por delante (desde PHI_DELANTE) y un poco por detrás.
+  const K = ELIPSOIDE_CASCARAS;
+  const thetaSuelo = Math.acos(-P.centroY / K.ry);
   const cascaras: THREE.BufferGeometry[] = [];
   for (const [desde, hasta] of [
-    [phiDelante, phiDetras],
-    [2 * Math.PI - phiDetras, 2 * Math.PI - phiDelante],
+    [PHI_DELANTE, PHI_DETRAS],
+    [2 * Math.PI - PHI_DETRAS, 2 * Math.PI - PHI_DELANTE],
   ] as const) {
     const g = new THREE.SphereGeometry(1, 64, 32, desde, hasta - desde, 0, thetaSuelo);
-    g.scale(rk.rx, rk.ry, rk.rz);
-    g.translate(P.x, CENTRO_Y, P.z);
+    g.scale(K.rx, K.ry, K.rz);
+    g.translate(P.x, P.centroY, P.z);
     cascaras.push(g);
   }
-  const trencadis = texturaTrencadis();
-  trencadis.repeat.set(26, 16);
+  const trencadis = crearTexturaTrencadis({ junta: '#d3d8dc', oscuro: '#ececee', claro: '#fcfcff' });
+  // Trozos de unos 70 cm (de cerca se ve el azulejo, de lejos es blanco).
+  trencadis.repeat.set(64, 40);
   const cascara = new THREE.Mesh(juntar(cascaras), new THREE.MeshStandardMaterial({ map: trencadis, roughness: 0.35, metalness: 0.05, side: THREE.DoubleSide }));
   cascara.castShadow = true;
   cascara.receiveShadow = true;
 
   // La pluma: una hoja curva (de perfil, en el plano x-y) de 7 m de grueso que
   // sale de lo alto de detrás, pasa por encima y vuela por delante del frente.
+  // Va 14 m más alta que lo alto de las cáscaras: por debajo, el mirador de la subida.
   const forma = new THREE.Shape();
   const atras = P.x + P.casco.rx * 0.55;
   const delante = P.x - P.casco.rx - 45;
-  forma.moveTo(atras, P.alto - 22);
-  forma.bezierCurveTo(atras - 60, P.alto + 24, P.x - 40, P.alto + 22, delante, P.alto - 8);
-  forma.bezierCurveTo(P.x - 60, P.alto + 4, atras - 70, P.alto + 4, atras, P.alto - 22);
+  const H = P.alto + 14;
+  forma.moveTo(atras, H - 22);
+  forma.bezierCurveTo(atras - 60, H + 24, P.x - 40, H + 22, delante, H - 8);
+  forma.bezierCurveTo(P.x - 60, H + 4, atras - 70, H + 4, atras, H - 22);
   // Algo girada (y más gruesa): de frente, que se vea como una hoja y no como una antena.
   const pluma = new THREE.Mesh(
     new THREE.ExtrudeGeometry(forma, { depth: 14, bevelEnabled: true, bevelThickness: 1.5, bevelSize: 1.5, bevelSegments: 2, curveSegments: 48 })
@@ -514,10 +470,10 @@ function crearPalau(): THREE.Group {
 
 /* ---------- La senyera ---------- */
 
-function crearSenyera(): { grupo: THREE.Group; ondear(t: number): void } {
+export function crearSenyera(x: number = SENYERA.x, y = 0, z: number = SENYERA.z): { grupo: THREE.Group; ondear(t: number): void } {
   const grupo = new THREE.Group();
   grupo.name = 'senyera';
-  grupo.position.set(SENYERA.x, 0, SENYERA.z);
+  grupo.position.set(x, y, z);
   const ALTO = 14;
   const mastil = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, ALTO, 8).translate(0, ALTO / 2, 0), new THREE.MeshStandardMaterial({ color: 0xd0d4d8, metalness: 0.6, roughness: 0.35 }));
   mastil.castShadow = true;
@@ -653,19 +609,21 @@ export interface EscenarioValencia {
   actualizar(t: number, camara: THREE.Vector3): void;
 }
 
-export function crearValencia(): EscenarioValencia {
+export function crearValencia(palau: Palau): EscenarioValencia {
   const grupo = new THREE.Group();
   grupo.name = 'valencia';
   grupo.position.set(CENTRO_VALENCIA.x, SUELO_VALENCIA, CENTRO_VALENCIA.z);
   const cielo = crearCielo();
   const senyera = crearSenyera();
-  grupo.add(cielo, crearSuelo(), crearEstanques(), crearHemisferic(), crearMuseu(), crearUmbracle(), crearPalmeras(), crearPalau(), senyera.grupo, crearCiudad(), crearMar());
+  const subida = crearSubidaPalau(palau);
+  grupo.add(cielo, crearSuelo(), crearEstanques(), crearHemisferic(), crearMuseu(), crearUmbracle(), crearPalmeras(), crearPalau(), subida.grupo, senyera.grupo, crearCiudad(), crearMar());
   return {
     grupo,
     actualizar(t, camara) {
       if (!grupo.visible) return;
       cielo.position.set(camara.x - grupo.position.x, camara.y - grupo.position.y, camara.z - grupo.position.z);
       senyera.ondear(t);
+      subida.ondear(t);
     },
   };
 }

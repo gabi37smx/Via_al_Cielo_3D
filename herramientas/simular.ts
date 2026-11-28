@@ -6,6 +6,7 @@
  *   npm run simular -- 20 - 2          20 torres de la grieta (tramo 2) con sus murciélagos
  *   npm run simular -- 20 - 3          20 laderas de la montaña (tramo 3) con sus águilas y el viento
  *   npm run simular -- 20 30 3         la ladera con 30 águilas
+ *   npm run simular -- 20 - 4          20 subidas del Palau de les Arts (tramo 4, Valencia: sin animales)
  *
  * Node 24 ejecuta TypeScript directamente (quita los tipos al cargar).
  */
@@ -13,6 +14,7 @@ import { murcielagosDelTramo } from '../src/reglas/partida.ts';
 import { AIRE } from '../src/reglas/aire.ts';
 import { INDICE_LADERA } from '../src/reglas/ladera.ts';
 import { ESCENARIOS } from '../src/reglas/torre.ts';
+import { INDICE_PALAU } from '../src/reglas/palau.ts';
 import { simularSubida } from '../src/bots/simulacion.ts';
 
 const torres = Number(process.argv[2]) || 20;
@@ -44,6 +46,7 @@ console.table(
     vida: r.vida,
   })),
 );
-console.log(`Tramo ${tramo + 1} (${ESCENARIOS[tramo]}): ${torres} torres con ${murcielagos} ${enLadera ? 'águilas y viento' : 'murciélagos'}, simuladas en ${Math.round(ms)} ms`);
+const peligro = tramo === INDICE_PALAU ? 'sin animales' : `con ${murcielagos} ${enLadera ? 'águilas y viento' : 'murciélagos'}`;
+console.log(`Tramo ${tramo + 1} (${ESCENARIOS[tramo]}): ${torres} subidas ${peligro}, simuladas en ${Math.round(ms)} ms`);
 console.log(`Llegan arriba: ${resultados.filter((r) => r.llego).length}/${torres} · mueren: ${resultados.filter((r) => r.murio).length}`);
 console.log(`Media: ${media((r) => r.segundos).toFixed(0)} s, ${media((r) => r.golpes).toFixed(1)} golpes, vida final ${media((r) => r.vida).toFixed(0)}, ${media((r) => r.tropiezos).toFixed(1)} tropiezos, ${media((r) => r.agarres).toFixed(1)} agarres`);
