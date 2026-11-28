@@ -21,6 +21,7 @@ export interface OpcionesPausa {
 
 const CONTROLES = (enCarrera: boolean): [string, string][] => [
   ['WASD / flechas', 'moverse'],
+  ['W, A o D × 3', 'correr solo hacia ese lado (cualquier tecla para)'],
   ['Espacio', 'saltar (otra vez en el aire: doble salto)'],
   ['Ratón / Q y E', 'girar la cámara (clic para capturar el ratón)'],
   ['Esc', 'soltar el ratón'],

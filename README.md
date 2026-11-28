@@ -24,6 +24,7 @@ Y abrir la dirección que sale (normalmente http://localhost:5173).
 | Control | Teclado y ratón | Mando |
 |---|---|---|
 | Moverse | WASD o flechas | stick izquierdo |
+| Correr solo (más rápido, sin mantener nada) | 3 toques seguidos de W, A o D (o las flechas): corre hacia ese lado hasta pulsar cualquier tecla | — |
 | Saltar / doble salto | Espacio (otra vez en el aire) | A |
 | Girar la cámara | ratón (clic para capturarlo, Esc lo suelta) o Q/E | stick derecho |
 | Pantalla completa | F o el botón de abajo a la derecha (Esc sale) | — |

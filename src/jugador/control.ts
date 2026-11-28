@@ -36,6 +36,8 @@ export interface Ordenes {
   saltar: boolean;
   /** Hacia dónde mira la cámara (rad): ver mundo/camara.ts. */
   giroCamara: number;
+  /** Corriendo solo (3 toques de avanzar): por el suelo, más rápido. */
+  correrSolo?: boolean;
 }
 
 /** Dónde está agarrado: el borde de un saliente. */
@@ -158,8 +160,10 @@ export function pasoEscalador(
   const cambio = (quiere ? C.aceleracion : C.frenado) * control * paso;
   const deriva = e.enSuelo ? deslizamiento(e, suelo) : viento;
   const deslizando = e.enSuelo && !quiere && Math.hypot(deriva.x, deriva.z) > 0.01;
-  const objetivoX = dx * C.velocidad + deriva.x;
-  const objetivoZ = dz * C.velocidad + deriva.z;
+  // Corriendo solo, más rápido, pero solo por el suelo (en el aire, como siempre: no se pasa los saltos).
+  const maxima = o.correrSolo && e.enSuelo ? C.velocidadCorrerSolo : C.velocidad;
+  const objetivoX = dx * maxima + deriva.x;
+  const objetivoZ = dz * maxima + deriva.z;
   // Se acerca como vector (no eje a eje) para que la diagonal frene igual.
   const ddx = objetivoX - e.vx;
   const ddz = objetivoZ - e.vz;
