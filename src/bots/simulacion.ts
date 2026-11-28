@@ -14,6 +14,7 @@ import {
   pasoPartida,
   type Peligros,
 } from '../reglas/partida.ts';
+import { generarAguilas, viento } from '../reglas/aire.ts';
 import { INDICE_LADERA, alturaSueloLadera, conCrampones, generarLadera, limiteMundo, salidaLadera, type Ladera, type Limite } from '../reglas/ladera.ts';
 import { generarFragmentosLadera } from '../reglas/partida.ts';
 import { alturaSuelo, generarTramo, puntoDeSalida } from '../reglas/torre.ts';
@@ -40,7 +41,7 @@ export interface ResultadoSimulacion {
 export interface OpcionesSimulacion {
   /** Qué tramo se sube (0 = la cueva, 1 = la grieta). */
   tramo?: number;
-  /** Sin él, los del tramo (`murcielagosDelTramo`). */
+  /** Sin él, los del tramo (`murcielagosDelTramo`). En la ladera, son águilas (sin él, `AIRE.aguilas`). */
   murcielagos?: number;
   /** Corta si tarda más (s). */
   limite?: number;
@@ -67,7 +68,7 @@ function escenario(semilla: number, indice: number, murcielagos?: number): Escen
       rellano: l.rellano,
       suelo: (x, z, techo) => alturaSueloLadera(l, x, z, techo),
       limite: limiteMundo(l),
-      peligros: { fragmentos: generarFragmentosLadera(semilla, l), murcielagos: [] },
+      peligros: { fragmentos: generarFragmentosLadera(semilla, l), murcielagos: [], aguilas: generarAguilas(semilla, l, murcielagos) },
       salida: salidaLadera(l),
       cerebro: crearCerebro((e, apoyo) => siguienteObjetivoLadera(e, l, apoyo)),
       ladera: l,
@@ -99,7 +100,8 @@ export function simularSubida(semilla: number, op: OpcionesSimulacion = {}): Res
 
   const tope = op.limite ?? 300;
   for (let t = 0; t < tope; t += PASO) {
-    const sucesos = pasoEscalador(e, cerebro.pensar(e), suelo, PASO, limite);
+    const aire = ladera ? viento(ladera, e.x, e.y, e.z, partida.tiempo) : undefined;
+    const sucesos = pasoEscalador(e, cerebro.pensar(e), suelo, PASO, limite, aire);
     if (ladera) e.crampones = conCrampones(ladera, e.x, e.y, e.z, e.crampones);
     if (sucesos.salto) r.saltos++;
     if (sucesos.dobleSalto) r.doblesSaltos++;

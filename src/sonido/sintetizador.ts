@@ -130,6 +130,8 @@ export const DURACION: Record<Sonido, number> = {
   gota: 0.35,
   crampones: 0.45,
   pasoNieve: 0.12,
+  graznido: 0.55,
+  rafaga: 2.7,
 };
 
 /**
@@ -250,6 +252,17 @@ export function tocar(ctx: Contexto, destino: AudioNode, sonido: Sonido, t0: num
       // Nieve que cruje bajo la bota y el pinchito de los crampones.
       soplo(ctx, destino, { filtro: 'bandpass', desde: 900 * v, hasta: 500 * v, q: 0.9, t0, dur: 0.1, vol: 0.2 * (0.5 + fuerza * 0.5), ataque: 0.01 });
       soplo(ctx, destino, { filtro: 'highpass', desde: 5000, t0, dur: 0.025, vol: 0.06 * (0.5 + fuerza * 0.5) });
+      break;
+    case 'graznido':
+      // El chillido del águila: agudo, rasposo y bajando, con un eco más corto.
+      tono(ctx, destino, { forma: 'sawtooth', desde: 2700 * v, hasta: 1500 * v, t0, dur: 0.32, vol: 0.05 * fuerza, ataque: 0.02 });
+      tono(ctx, destino, { forma: 'triangle', desde: 2750 * v, hasta: 1600 * v, t0, dur: 0.32, vol: 0.08 * fuerza, ataque: 0.02 });
+      tono(ctx, destino, { forma: 'triangle', desde: 2500 * v, hasta: 1700 * v, t0: t0 + 0.36, dur: 0.15, vol: 0.04 * fuerza, ataque: 0.01 });
+      break;
+    case 'rafaga':
+      // Una ráfaga de viento: un soplido que crece, silba un poco y se va.
+      soplo(ctx, destino, { filtro: 'bandpass', desde: 350, hasta: 900, q: 0.8, t0, dur: 2.5, vol: 0.32, ataque: 0.9 });
+      soplo(ctx, destino, { filtro: 'bandpass', desde: 1800, hasta: 2600, q: 6, t0: t0 + 0.3, dur: 2, vol: 0.07, ataque: 0.7 });
       break;
     case 'gota': {
       // Gota de agua en la cueva y su eco.

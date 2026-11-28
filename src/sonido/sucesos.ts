@@ -35,6 +35,8 @@ export const SONIDOS = [
   'gota',
   'crampones',
   'pasoNieve',
+  'graznido',
+  'rafaga',
 ] as const;
 
 export type Sonido = (typeof SONIDOS)[number];
@@ -69,6 +71,7 @@ export function sonidosDelPaso(o: Oido, r: PasoCorredor, e: Escalador, paso: num
 
   if (r.reaparecio) tocar('reaparecer');
   if (r.crampones) tocar('crampones');
+  if (r.rafaga) tocar('rafaga');
   if (s.dobleSalto) tocar('dobleSalto');
   else if (s.salto) tocar('salto');
   if (s.agarre) tocar('agarre');
@@ -81,7 +84,10 @@ export function sonidosDelPaso(o: Oido, r: PasoCorredor, e: Escalador, paso: num
   for (const j of r.jugadas) {
     if (j.tipo === 'caida') tocar('caida', limitar(0.6 + j.metros / 40));
     else if (j.tipo === 'fin') tocar('derrota');
-    else tocar(j.tipo);
+    else if (j.tipo === 'golpe' && j.animal === 'aguila') {
+      tocar('golpe');
+      tocar('graznido');
+    } else tocar(j.tipo);
   }
 
   // Pasos: solo corriendo por el suelo.

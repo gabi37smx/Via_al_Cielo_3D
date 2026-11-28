@@ -27,6 +27,8 @@ import { crearMontana } from './mundo/montana.ts';
 import { crearEstalactitas, crearGrieta } from './mundo/grieta.ts';
 import { crearAdornos } from './mundo/adornos.ts';
 import { crearFragmentos, crearMurcielagos } from './mundo/objetos.ts';
+import { crearAguilas, crearNieve } from './mundo/aire.ts';
+import { aguilaCerca, generarAguilas, rafagaEn } from './reglas/aire.ts';
 import { crearSombra } from './mundo/sombra.ts';
 import { crearTexturaRoca } from './mundo/texturas.ts';
 import { crearTorre } from './mundo/torre.ts';
@@ -111,6 +113,8 @@ const limite = limiteMundo(ladera);
 const peligros = {
   fragmentos: [...tramos.flatMap((t) => generarFragmentos(semilla, t)), ...generarFragmentosLadera(semilla, ladera)],
   murcielagos: tramos.flatMap((t) => generarMurcielagos(semilla, t, murcielagosDelTramo(t.indice))),
+  // Fuera, en la montaña, águilas (y viento: lo pone pasoCorredor con la ladera).
+  aguilas: generarAguilas(semilla, ladera),
 };
 const ejesLadera = ejes(ladera);
 /** Fuera, la cámara va detrás del escalador, mirando a la montaña (hacia +N). */
@@ -134,6 +138,8 @@ const montana = {
 };
 const fragmentos = crearFragmentos(peligros.fragmentos);
 const murcielagos = crearMurcielagos(peligros.murcielagos);
+const aguilas = crearAguilas(peligros.aguilas);
+const nieve = crearNieve();
 mundo.escena.add(
   crearCueva(roca, tramo),
   crearTorre(tramo, piedra),
@@ -146,6 +152,8 @@ mundo.escena.add(
   crearMontana(ladera, montana),
   fragmentos.grupo,
   murcielagos.grupo,
+  aguilas.grupo,
+  nieve.grupo,
 );
 
 // Dónde empieza: en el suelo antes del primer saliente, o en el saliente pedido con
@@ -260,6 +268,8 @@ const pausa = crearMenuPausa(document.querySelector<HTMLElement>('#pausa')!, {
 
 /** Fin de la partida (solo) con récord nuevo: suena «record» en vez de «derrota». */
 let recordEnEstePaso = false;
+/** Segundos hasta que pueda volver a oírse un águila que pasa cerca (que no chille sin parar). */
+let esperaGraznido = 0;
 
 /** Lo que se ve y se oye reacciona a las jugadas de las reglas. */
 function atender(j: Jugada) {
@@ -334,6 +344,14 @@ const bucle = crearBucle({
     audio.sonarTodos(recordEnEstePaso ? toques.map((t) => (t.sonido === 'derrota' ? { ...t, sonido: 'record' as const } : t)) : toques);
     carrera?.despuesDelPaso(paso, jugador, r);
 
+    // Un águila que pasa cerca se oye venir (un chillido más flojo que el del golpe).
+    esperaGraznido = Math.max(esperaGraznido - paso, 0);
+    const yo = jugador.escalador;
+    if (esperaGraznido === 0 && yo.y > BASE_LADERA && aguilaCerca(peligros.aguilas, jugador.partida.tiempo, yo.x, yo.y + 1, yo.z, 7)) {
+      audio.sonar('graznido', 0.5);
+      esperaGraznido = 4;
+    }
+
     // Jugando solo, al subir al rellano de los 220 m empieza la grieta.
     const enTramo = tramoEnAltura(jugador.partida.alturaMaxima);
     if (!carrera && enTramo > tramoAlcanzado) {
@@ -384,10 +402,17 @@ const bucle = crearBucle({
     const t = partida.tiempo + alfa * (1 / 60);
     fragmentos.animar(t);
     murcielagos.actualizar(t);
+    // Las águilas, solo por fuera (en la cueva no se ven y no gastan).
+    aguilas.grupo.visible = pintado.y > BASE_LADERA - 30;
+    if (aguilas.grupo.visible) aguilas.actualizar(t);
     rivales.pintar(performance.now(), dtReal);
     const mezcla = mezclaEscenario(pintado.y);
     const exterior = mezclaExterior(aLocal(ladera, pintado.x, pintado.z).d, pintado.y, BASE_LADERA);
     mundo.ambientar(mezcla, exterior);
+    // Los copos y las rayas del viento: con la ráfaga de ahora, alrededor de la cámara.
+    const rafaga = rafagaEn(ladera, t);
+    const soplo = rafaga.intensidad * rafaga.fuerza * rafaga.sentido;
+    nieve.actualizar(dtReal, mundo.camara.position, { x: ejesLadera.tx * soplo, z: ejesLadera.tz * soplo }, rafaga.intensidad, exterior);
     audio.actualizar(dtReal, mezcla, exterior);
     if (sala && lista && carrera) {
       carrera.pintar(alfa, dtReal, jugador, e.y);
