@@ -152,3 +152,50 @@ export function materialRoca(tex: TexturaRoca, rx: number, ry: number, extra: TH
     ...extra,
   });
 }
+
+/**
+ * El TRENCADÍS (Valencia): azulejo roto en trozos irregulares con las juntas
+ * entre ellos. Cada trozo, de un tono entre `oscuro` y `claro`. Blanco en las
+ * cáscaras del Palau y naranja en los salientes de la subida.
+ */
+export function crearTexturaTrencadis(op: { junta: string; oscuro: string; claro: string; semilla?: number }): THREE.CanvasTexture {
+  const tam = 512;
+  const lienzo = document.createElement('canvas');
+  lienzo.width = lienzo.height = tam;
+  const ctx = lienzo.getContext('2d')!;
+  ctx.fillStyle = op.junta;
+  ctx.fillRect(0, 0, tam, tam);
+  // Azar propio (como el de las rocas): el mismo dibujo siempre.
+  let s = op.semilla ?? 4401;
+  const azar = () => ((s = (s * 1103515245 + 12345) >>> 0) / 0xffffffff);
+  const entre = (a: number, b: number) => a + (b - a) * azar();
+  const oscuro = new THREE.Color(op.oscuro);
+  const claro = new THREE.Color(op.claro);
+  const c = new THREE.Color();
+  // Trozos: polígonos de 5-7 lados alrededor de una rejilla torcida.
+  const CELDA = 32;
+  for (let y = -1; y <= tam / CELDA; y++) {
+    for (let x = -1; x <= tam / CELDA; x++) {
+      const cx = (x + 0.5 + entre(-0.25, 0.25)) * CELDA;
+      const cy = (y + 0.5 + entre(-0.25, 0.25)) * CELDA;
+      const lados = 5 + Math.floor(azar() * 3);
+      ctx.fillStyle = `#${c.lerpColors(oscuro, claro, azar()).getHexString()}`;
+      ctx.beginPath();
+      for (let k = 0; k < lados; k++) {
+        const a = (k / lados) * Math.PI * 2 + entre(-0.2, 0.2);
+        const r = CELDA * entre(0.42, 0.62);
+        const px = cx + Math.cos(a) * r;
+        const py = cy + Math.sin(a) * r;
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(lienzo);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
