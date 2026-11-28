@@ -32,6 +32,38 @@ function alturaDeSalto(doble: boolean): number {
   return max;
 }
 
+describe('correr solo (3 toques de avanzar)', () => {
+  const ADELANTE: Ordenes = { ...QUIETO, moverY: 1 };
+  /** Sin la pared del pozo: aquí se corre lejos. */
+  const sinPared = () => null;
+  const correr = (e: Escalador, n: number, o: Ordenes) => {
+    for (let i = 0; i < n; i++) pasoEscalador(e, o, PLANO, PASO, sinPared);
+  };
+  it('por el suelo llega a la velocidad de correr solo; sin ello, a la de siempre', () => {
+    const e = nuevo();
+    correr(e, 60, { ...ADELANTE, correrSolo: true });
+    expect(Math.hypot(e.vx, e.vz)).toBeCloseTo(C.velocidadCorrerSolo, 5);
+    const f = nuevo();
+    correr(f, 60, ADELANTE);
+    expect(Math.hypot(f.vx, f.vz)).toBeCloseTo(C.velocidad, 5);
+    expect(C.velocidadCorrerSolo).toBeGreaterThan(C.velocidad);
+  });
+
+  it('en el aire va como siempre (no se pasa los saltos) y al caer sigue corriendo', () => {
+    const e = nuevo();
+    correr(e, 60, { ...ADELANTE, correrSolo: true });
+    pasoEscalador(e, { ...ADELANTE, correrSolo: true, saltar: true }, PLANO, PASO, sinPared);
+    let maxAire = 0;
+    for (let i = 0; i < 200 && !e.enSuelo; i++) {
+      pasoEscalador(e, { ...ADELANTE, correrSolo: true }, PLANO, PASO, sinPared);
+      if (!e.enSuelo && i > 30) maxAire = Math.max(maxAire, Math.hypot(e.vx, e.vz));
+    }
+    expect(maxAire).toBeLessThanOrEqual(C.velocidad + 1e-6);
+    correr(e, 60, { ...ADELANTE, correrSolo: true });
+    expect(Math.hypot(e.vx, e.vz)).toBeCloseTo(C.velocidadCorrerSolo, 5);
+  });
+});
+
 describe('salto', () => {
   it('el salto normal sube unos 3,5 m: llega a cualquier saliente (están a 2-3 m)', () => {
     const h = alturaDeSalto(false);

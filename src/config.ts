@@ -8,6 +8,16 @@ export const CONFIG = {
     radio: 0.35,
     /** Velocidad máxima corriendo (m/s). */
     velocidad: 6,
+    /**
+     * CORRER SOLO (Gabi, 28-nov): con 3 toques seguidos de W, A o D (o las
+     * flechas) sale corriendo hacia ese lado a esta velocidad sin mantener
+     * nada pulsado, hasta pulsar cualquier tecla. Solo por el suelo: en el
+     * aire, la velocidad de siempre.
+     */
+    velocidadCorrerSolo: 10,
+    toquesCorrer: 3,
+    /** Como mucho, tiempo entre un toque y el siguiente (s). */
+    separacionToques: 0.4,
     /** Cuánto gana velocidad al pulsar (m/s²) y cuánto la pierde al soltar. */
     aceleracion: 45,
     frenado: 60,

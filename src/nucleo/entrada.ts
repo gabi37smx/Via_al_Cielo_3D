@@ -18,13 +18,19 @@ export interface Mando {
   ratonX: number;
   ratonY: number;
   saltar: boolean;
+  /** Corriendo solo (3 toques de W, A o D, hasta pulsar cualquier tecla): se mueve sin pulsar nada. */
+  correrSolo: boolean;
 }
 
 export interface Entrada {
   leer(): Mando;
+  /** Deja de correr solo (al subir a la avioneta, al acabar la partida…). */
+  pararCorrer(): void;
   /** Llama a `accion` una vez cada vez que se pulsa la tecla (p. ej. F3). */
   alPulsar(codigo: string, accion: () => void): void;
 }
+
+import { DIRECCION, crearCorrerSolo, pararCorrer, pulsarTecla } from './correrSolo.ts';
 
 const ZONA_MUERTA = 0.15;
 const muerta = (v: number) => (Math.abs(v) < ZONA_MUERTA ? 0 : v);
@@ -37,9 +43,11 @@ export function crearEntrada(lienzo: HTMLCanvasElement): Entrada {
   let ratonX = 0;
   let ratonY = 0;
   let botonSaltoAntes = false;
+  const correr = crearCorrerSolo();
 
   window.addEventListener('keydown', (e) => {
     if (!e.repeat) {
+      pulsarTecla(correr, e.code, performance.now() / 1000);
       acciones.get(e.code)?.();
       if (e.code === 'Space') saltoPendiente = true;
     }
@@ -82,6 +90,8 @@ export function crearEntrada(lienzo: HTMLCanvasElement): Entrada {
         botonSaltoAntes = boton;
       }
 
+      // Corriendo solo: hacia delante o de lado (según la cámara) sin pulsar nada.
+      if (correr.activo) ({ moverX, moverY } = DIRECCION[correr.activo]);
       const mando: Mando = {
         moverX: limitar(moverX),
         moverY: limitar(moverY),
@@ -90,11 +100,13 @@ export function crearEntrada(lienzo: HTMLCanvasElement): Entrada {
         ratonX,
         ratonY,
         saltar,
+        correrSolo: correr.activo !== null,
       };
       saltoPendiente = false;
       ratonX = ratonY = 0;
       return mando;
     },
     alPulsar: (codigo, accion) => acciones.set(codigo, accion),
+    pararCorrer: () => pararCorrer(correr),
   };
 }

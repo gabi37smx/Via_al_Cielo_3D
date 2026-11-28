@@ -332,6 +332,8 @@ const pausa = crearMenuPausa(document.querySelector<HTMLElement>('#pausa')!, {
   },
 });
 
+/** Corría solo en el paso anterior (para avisar al empezar). */
+let corriendoAntes = false;
 /** Fin de la partida (solo) con récord nuevo: suena «record» en vez de «derrota». */
 let recordEnEstePaso = false;
 /** Segundos hasta que pueda volver a oírse un águila que pasa cerca (que no chille sin parar). */
@@ -385,6 +387,7 @@ const bucle = crearBucle({
     // En la avioneta: el escalador no se mueve y la partida no avanza (el
     // contador de altura se queda quieto). Espacio o Enter saltan la escena.
     if (viaje.volando()) {
+      entrada.pararCorrer();
       Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
       if (m.saltar) viaje.saltar();
       if (viaje.paso(paso)) bajarEnValencia();
@@ -407,9 +410,13 @@ const bucle = crearBucle({
     // Quieto en la espera y la cuenta atrás de la carrera, y con la partida
     // acabada en solo (pero sigue cayendo si estaba en el aire).
     const quieto = carrera ? !carrera.sePuedeMover() || pausa.abierto() : jugador.partida.terminada;
+    // Quieto, tampoco se corre solo (al poder moverse otra vez no sale corriendo).
+    if (quieto) entrada.pararCorrer();
+    if (m.correrSolo && !corriendoAntes && !quieto) hud.avisar('» Corriendo · cualquier tecla para parar', 'info');
+    corriendoAntes = m.correrSolo && !quieto;
     const ordenes = quieto
       ? { ...QUIETO, giroCamara: camara.giro }
-      : { moverX: m.moverX, moverY: m.moverY, saltar: m.saltar, giroCamara: camara.giro };
+      : { moverX: m.moverX, moverY: m.moverY, saltar: m.saltar, giroCamara: camara.giro, correrSolo: m.correrSolo };
     const tiempo = carrera ? carrera.estado.tiempo : jugador.partida.tiempo;
     // En Valencia no hay viento de montaña ni crampones (sin la ladera).
     const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso, limite, enCiudad ? undefined : ladera);
