@@ -14,7 +14,7 @@ import { crearOido, sonidosDelPaso } from './sonido/sucesos.ts';
 import { crearBucle } from './nucleo/bucle.ts';
 import { crearEntrada } from './nucleo/entrada.ts';
 import { REGLAS, generarFragmentos, generarFragmentosLadera, generarMurcielagos, murcielagosDelTramo, type Jugada } from './reglas/partida.ts';
-import { BASE_LADERA, CIMA, RADIO_COLINA, TUNEL, aLocal, aMundo, acortarFuera, alturaEnSaliente, alturaSueloLadera, centroSaliente, conCrampones, ejes, generarLadera, limiteMundo, salidaLadera } from './reglas/ladera.ts';
+import { BASE_LADERA, CIMA, RADIO_COLINA, TUNEL, aLocal, aMundo, acortarFuera, alturaEnSaliente, alturaSueloLadera, centroSaliente, conCrampones, dCara, ejes, generarLadera, limiteMundo, salidaLadera } from './reglas/ladera.ts';
 import { crearCorredor, pasoCorredor, type Corredor } from './reglas/carrera.ts';
 import { crearCarreraEnSala } from './modos/carrera.ts';
 import { crearPantallaCarrera } from './ui/carrera.ts';
@@ -33,6 +33,12 @@ import { crearSombra } from './mundo/sombra.ts';
 import { crearTexturaRoca } from './mundo/texturas.ts';
 import { crearTorre } from './mundo/torre.ts';
 import { crearPantallaFin, guardarRecord, leerRecord } from './ui/fin.ts';
+import { crearAerodromo, crearAvioneta } from './mundo/avioneta.ts';
+import { crearValencia } from './mundo/valencia.ts';
+import { crearPantallaVuelo } from './ui/vuelo.ts';
+import { crearViaje } from './modos/viaje.ts';
+import { tocaAvioneta } from './reglas/vuelo.ts';
+import { alturaSueloValencia, enValencia, limiteValencia, llegadaValencia } from './reglas/valencia.ts';
 import { crearContadorFps } from './ui/fps.ts';
 import { crearHud } from './ui/hud.ts';
 import { crearPanel } from './ui/panel.ts';
@@ -45,6 +51,8 @@ import { crearPanel } from './ui/panel.ts';
  *   ?solo=1         modo solo sin pasar por el menú
  *   ?sala=ABCD&nombre=Ana   entra directamente en esa sala (la crea si está vacía)
  *   ?aspecto=escaladora     sube la escaladora (sin él, el último elegido en el menú)
+ *   ?altura=660             empieza en la cima, junto a la avioneta
+ *   ?valencia=1             empieza ya en Valencia, al bajar de la avioneta
  */
 const parametros = new URLSearchParams(location.search);
 const alturaInicial = Number(parametros.get('altura')) || 0;
@@ -61,7 +69,7 @@ crearBotonSonido(document.querySelector<HTMLButtonElement>('#sonido')!, audio);
 let eleccion: Eleccion;
 const codigoUrl = normalizarCodigo(parametros.get('sala') ?? '');
 if (codigoUrl) eleccion = { modo: 'unirse', codigo: codigoUrl, nombre: limpiarNombre(parametros.get('nombre') ?? '') };
-else if (['semilla', 'altura', 'solo'].some((p) => parametros.has(p))) eleccion = { modo: 'solo' };
+else if (['semilla', 'altura', 'solo', 'valencia'].some((p) => parametros.has(p))) eleccion = { modo: 'solo' };
 else eleccion = await mostrarMenu(menu, configRed !== null);
 
 /** Escalador o escaladora: el de la dirección (?aspecto=) o el último elegido en el menú. */
@@ -102,14 +110,17 @@ entrada.alPulsar('F3', panel.alternar);
 window.addEventListener('resize', mundo.redimensionar);
 
 // El mundo: la cueva (0-220 m), la grieta (220-440 m) y, saliendo por el
-// pasillo, la ladera de la montaña (440-660 m). La carrera acaba en el
-// rellano de la cueva (`tramo`); jugando solo se sigue.
+// pasillo, la ladera de la montaña (440-660 m). De la cima se va en avioneta
+// a Valencia (tramo 4), que está lejos. La carrera acaba en el rellano de la
+// cueva (`tramo`); jugando solo se sigue.
 const tramos = [0, 1].map((i) => generarTramo(semilla, i));
 const tramo = tramos[0]!;
 const ladera = generarLadera(semilla);
-const suelo = (x: number, z: number, techo: number) => Math.max(alturaSueloTorre(tramos, x, z, techo), alturaSueloLadera(ladera, x, z, techo));
-/** Por dónde no se puede pasar: la pared del pozo, el pasillo, la colina y la montaña. */
-const limite = limiteMundo(ladera);
+const suelo = (x: number, z: number, techo: number) =>
+  enValencia(x, z) ? alturaSueloValencia(x, z, techo) : Math.max(alturaSueloTorre(tramos, x, z, techo), alturaSueloLadera(ladera, x, z, techo));
+/** Por dónde no se puede pasar: la pared del pozo, el pasillo, la colina y la montaña; en Valencia, lo suyo. */
+const limiteMontana = limiteMundo(ladera);
+const limite: typeof limiteMontana = (p, y) => (enValencia(p.x, p.z) ? limiteValencia(p, y) : limiteMontana(p, y));
 const peligros = {
   fragmentos: [...tramos.flatMap((t) => generarFragmentos(semilla, t)), ...generarFragmentosLadera(semilla, ladera)],
   murcielagos: tramos.flatMap((t) => generarMurcielagos(semilla, t, murcielagosDelTramo(t.indice))),
@@ -119,8 +130,11 @@ const peligros = {
 const ejesLadera = ejes(ladera);
 /** Fuera, la cámara va detrás del escalador, mirando a la montaña (hacia +N). */
 const giroFuera = Math.atan2(-ejesLadera.nx, -ejesLadera.nz);
+/** En Valencia la cámara va detrás del escalador, mirando al Palau (hacia +X). */
+const GIRO_VALENCIA = -Math.PI / 2;
 /** ¿Está en el pasillo o fuera? (ahí la cámara mira a la montaña, no a la pared del pozo) */
 function fuera(x: number, z: number, y: number): boolean {
+  if (enValencia(x, z)) return false;
   if (y < BASE_LADERA - 1) return false;
   const { d, u } = aLocal(ladera, x, z);
   return Math.hypot(x, z) > RADIO_COLINA - 1 || (d > 11 && Math.abs(u) < TUNEL.ancho);
@@ -140,7 +154,8 @@ const fragmentos = crearFragmentos(peligros.fragmentos);
 const murcielagos = crearMurcielagos(peligros.murcielagos);
 const aguilas = crearAguilas(peligros.aguilas);
 const nieve = crearNieve();
-mundo.escena.add(
+// Lo de la montaña (de la cueva a la cima): en Valencia se esconde.
+const deLaMontana = [
   crearCueva(roca, tramo),
   crearTorre(tramo, piedra),
   crearEstalactitas(tramo, 0x5a5146, 2201), // el techo de la cueva
@@ -150,15 +165,32 @@ mundo.escena.add(
   crearAdornos(tramo, { semilla: 5101, dinosaurios: 3, personas: 5, amonites: 0, craneos: 14, delSuelo: true, hueso: 0xd8cdb0 }),
   crearAdornos(tramos[1]!, { semilla: 5102, dinosaurios: 1, personas: 2, amonites: 10, craneos: 8, delSuelo: false, hueso: 0xeae2cf }),
   crearMontana(ladera, montana),
+  crearAerodromo(ladera),
   fragmentos.grupo,
   murcielagos.grupo,
   aguilas.grupo,
   nieve.grupo,
-);
+];
+const valencia = crearValencia();
+const avioneta = crearAvioneta();
+mundo.escena.add(...deLaMontana, valencia.grupo, avioneta.grupo);
+/** Enseña la montaña o Valencia (las dos a la vez, nunca: están lejos y gastaría). */
+let lugarVisible: 'montana' | 'valencia' | null = null;
+function verLugar(lugar: 'montana' | 'valencia') {
+  if (lugar === lugarVisible) return;
+  lugarVisible = lugar;
+  for (const o of deLaMontana) o.visible = lugar === 'montana';
+  valencia.grupo.visible = lugar === 'valencia';
+  // Fuera, el sol viene desde detrás de quien mira: a la montaña o al Palau (+X).
+  if (lugar === 'valencia') mundo.orientarSol(1, 0);
+  else mundo.orientarSol(ejesLadera.nx, ejesLadera.nz);
+}
 
 // Dónde empieza: en el suelo antes del primer saliente, o en el saliente pedido con
 // ?altura (desde 440 m, en la explanada delante del pasillo o en un saliente de la ladera).
 function sitioDeInicio(): { x: number; y: number; z: number } {
+  // En la cima (`?altura=660`): junto al borde, delante de la bandera; la avioneta, a unos pasos.
+  if (alturaInicial >= CIMA) return { ...aMundo(ladera, dCara(CIMA) + 1.5, 4), y: CIMA };
   if (alturaInicial >= BASE_LADERA) {
     const s = ladera.salientes.find((x) => x.y >= alturaInicial);
     if (!s || alturaInicial === BASE_LADERA) return { ...salidaLadera(ladera), y: BASE_LADERA };
@@ -186,6 +218,27 @@ const camara = crearCamaraTerceraPersona(
   empiezaFuera ? giroFuera : giroHaciaPared(salida.x, salida.z),
   empiezaFuera ? CONFIG.camara.inclinacionFuera : CONFIG.camara.inclinacion,
 );
+
+// El viaje en avioneta (solo jugando solo: la carrera acaba a 220 m).
+const viaje = crearViaje({
+  ladera,
+  avioneta,
+  pantalla: crearPantallaVuelo(document.querySelector<HTMLElement>('#vuelo')!),
+  sonar: audio.sonar,
+  motor: audio.motor,
+});
+entrada.alPulsar('Enter', () => viaje.saltar());
+
+/** Al bajar de la avioneta: junto a la puerta, mirando al Palau, sin crampones. */
+function bajarEnValencia() {
+  const s = llegadaValencia();
+  const e = jugador.escalador;
+  Object.assign(e, { x: s.x, y: s.y, z: s.z, vx: 0, vy: 0, vz: 0, enSuelo: true, orientacion: s.orientacion, alturaMaxima: s.y });
+  Object.assign(e, { agarre: null, trepar: 0, crampones: false, postura: 'quieto' as const });
+  Object.assign(anterior, { x: s.x, y: s.y, z: s.z });
+  camara.colocar(GIRO_VALENCIA, CONFIG.camara.inclinacionFuera);
+  verLugar('valencia');
+}
 
 // 2 · Los rivales de la sala: aparecen y desaparecen según la presencia de Supabase.
 const rivales = crearRivales(mundo.escena, modelos, (x, y, z, antes) => conCrampones(ladera, x, y, z, antes));
@@ -231,6 +284,19 @@ function reiniciar(puestoCarrera?: number) {
   cimaAlcanzada = e.y >= CIMA - 0.01;
   oido = crearOido();
   fragmentos.mostrarTodos();
+  // La avioneta vuelve a esperar en la cima (o, con ?valencia=1, se empieza ya allí).
+  viaje.reiniciar();
+  verLugar('montana');
+  if (puestoCarrera === undefined && !sala && parametros.has('valencia')) {
+    viaje.yaEnValencia();
+    bajarEnValencia();
+    tramoAlcanzado = tramoEnAltura(CIMA, true);
+    cimaAlcanzada = true;
+  } else {
+    // La cámara, de golpe a su sitio (al volver de Valencia no cruza el mapa volando).
+    const afuera = fuera(e.x, e.z, e.y);
+    camara.colocar(afuera ? giroFuera : giroHaciaPared(e.x, e.z), afuera ? CONFIG.camara.inclinacionFuera : CONFIG.camara.inclinacion);
+  }
 }
 reiniciar();
 
@@ -316,13 +382,23 @@ const bucle = crearBucle({
       Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
       return;
     }
+    // En la avioneta: el escalador no se mueve y la partida no avanza (el
+    // contador de altura se queda quieto). Espacio o Enter saltan la escena.
+    if (viaje.volando()) {
+      Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
+      if (m.saltar) viaje.saltar();
+      if (viaje.paso(paso)) bajarEnValencia();
+      return;
+    }
     camara.girar(
       -m.ratonX * CC.sensibilidadRaton - m.girarX * CC.velocidadGiro * paso,
       m.ratonY * CC.sensibilidadRaton + m.girarY * CC.velocidadGiro * paso,
     );
     const e0 = jugador.escalador;
+    const enCiudad = enValencia(e0.x, e0.z);
     const afuera = fuera(e0.x, e0.z, e0.y);
-    camara.recolocar(e0.x, e0.z, paso, afuera ? giroFuera : undefined, afuera ? CC.inclinacionFuera : undefined);
+    const giroIdeal = enCiudad ? GIRO_VALENCIA : afuera ? giroFuera : undefined;
+    camara.recolocar(e0.x, e0.z, paso, giroIdeal, enCiudad || afuera ? CC.inclinacionFuera : undefined);
     anterior.x = e0.x;
     anterior.y = e0.y;
     anterior.z = e0.z;
@@ -335,7 +411,8 @@ const bucle = crearBucle({
       ? { ...QUIETO, giroCamara: camara.giro }
       : { moverX: m.moverX, moverY: m.moverY, saltar: m.saltar, giroCamara: camara.giro };
     const tiempo = carrera ? carrera.estado.tiempo : jugador.partida.tiempo;
-    const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso, limite, ladera);
+    // En Valencia no hay viento de montaña ni crampones (sin la ladera).
+    const r = pasoCorredor(jugador, ordenes, tramo, suelo, peligros, tiempo, paso, limite, enCiudad ? undefined : ladera);
     if (r.sucesos.aterrizaje > 0.5) personaje.aterrizar(r.sucesos.aterrizaje / 6);
     if (r.reaparecio) Object.assign(anterior, { x: jugador.escalador.x, y: jugador.escalador.y, z: jugador.escalador.z });
     recordEnEstePaso = false;
@@ -352,18 +429,25 @@ const bucle = crearBucle({
       esperaGraznido = 4;
     }
 
-    // Jugando solo, al subir al rellano de los 220 m empieza la grieta.
-    const enTramo = tramoEnAltura(jugador.partida.alturaMaxima);
+    // Jugando solo, al subir al rellano de los 220 m empieza la grieta (y al bajar de la avioneta, Valencia).
+    const enTramo = tramoEnAltura(jugador.partida.alturaMaxima, enValencia(jugador.escalador.x, jugador.escalador.z));
     if (!carrera && enTramo > tramoAlcanzado) {
       tramoAlcanzado = enTramo;
       hud.avisar(`Tramo ${enTramo + 1} · ${ESCENARIOS[enTramo]}`, 'bueno');
+      if (ESCENARIOS[enTramo] === 'Valencia') hud.avisar('Ciutat de les Arts i les Ciències', 'info');
       audio.sonar('tramo');
     }
-    // Y en lo alto de la montaña, la cima (de momento, el final).
-    if (!carrera && !cimaAlcanzada && jugador.escalador.enSuelo && jugador.escalador.y >= CIMA - 0.01) {
+    // Y en lo alto de la montaña, la cima: la avioneta espera.
+    if (!carrera && !cimaAlcanzada && jugador.escalador.enSuelo && jugador.escalador.y >= CIMA - 0.01 && !enCiudad) {
       cimaAlcanzada = true;
       hud.avisar(`¡Cima! ${CIMA} m`, 'bueno');
+      hud.avisar('✈ La avioneta te espera: ve hasta ella', 'info');
       audio.sonar('victoria');
+    }
+    // Tocar la avioneta de la cima = subirse (solo jugando solo y con vida).
+    const yoAhora = jugador.escalador;
+    if (!carrera && viaje.estado === 'montana' && !jugador.partida.terminada && tocaAvioneta(ladera, yoAhora.x, yoAhora.y, yoAhora.z)) {
+      viaje.empezar();
     }
 
     // 10 veces por segundo, contar a la sala dónde estoy.
@@ -390,29 +474,36 @@ const bucle = crearBucle({
     pintado.y = anterior.y + (e.y - anterior.y) * alfa;
     pintado.z = anterior.z + (e.z - anterior.z) * alfa;
 
+    // Volando, la cámara es la de la escena y el escalador va dentro de la avioneta.
+    const pose = viaje.pintar(alfa, dtReal, mundo.camara);
+    const enCiudad = pose ? pose.lugar === 'valencia' : enValencia(pintado.x, pintado.z);
+    verLugar(enCiudad ? 'valencia' : 'montana');
     personaje.colocar(pintado.x, pintado.y, pintado.z, e.orientacion);
     personaje.animar(e.postura, Math.hypot(e.vx, e.vz), progresoPostura(e), dtReal);
     personaje.ponerCrampones(e.crampones);
     // Parpadea mientras es invulnerable; esperando a reaparecer, no se ve.
     personaje.raiz.visible =
-      jugador.reaparecerEn === 0 && (partida.invulnerable === 0 || Math.floor(partida.invulnerable * 12) % 2 === 0);
+      !pose && jugador.reaparecerEn === 0 && (partida.invulnerable === 0 || Math.floor(partida.invulnerable * 12) % 2 === 0);
+    sombra.mancha.visible = !pose;
     sombra.colocar(pintado.x, suelo(pintado.x, pintado.z, pintado.y + 0.05), pintado.z, pintado.y);
-    camara.seguir(pintado.x, pintado.y, pintado.z, dtReal, (m, c) => acortarFuera(ladera, m, c));
+    if (!pose) camara.seguir(pintado.x, pintado.y, pintado.z, dtReal, enCiudad ? undefined : (m, c) => acortarFuera(ladera, m, c));
 
     const t = partida.tiempo + alfa * (1 / 60);
     fragmentos.animar(t);
     murcielagos.actualizar(t);
-    // Las águilas, solo por fuera (en la cueva no se ven y no gastan).
-    aguilas.grupo.visible = pintado.y > BASE_LADERA - 30;
+    // Las águilas, solo por fuera (en la cueva no se ven y no gastan; en Valencia no hay).
+    aguilas.grupo.visible = !enCiudad && pintado.y > BASE_LADERA - 30;
     if (aguilas.grupo.visible) aguilas.actualizar(t);
     rivales.pintar(performance.now(), dtReal);
     const mezcla = mezclaEscenario(pintado.y);
-    const exterior = mezclaExterior(aLocal(ladera, pintado.x, pintado.z).d, pintado.y, BASE_LADERA);
-    mundo.ambientar(mezcla, exterior);
-    // Los copos y las rayas del viento: con la ráfaga de ahora, alrededor de la cámara.
+    // Volando por la cima ya se está fuera (el escalador va dentro de la avioneta).
+    const exterior = enCiudad || pose ? 1 : mezclaExterior(aLocal(ladera, pintado.x, pintado.z).d, pintado.y, BASE_LADERA);
+    mundo.ambientar(mezcla, exterior, enCiudad ? 1 : 0);
+    // Los copos y las rayas del viento: con la ráfaga de ahora, alrededor de la cámara (en Valencia, no).
     const rafaga = rafagaEn(ladera, t);
     const soplo = rafaga.intensidad * rafaga.fuerza * rafaga.sentido;
-    nieve.actualizar(dtReal, mundo.camara.position, { x: ejesLadera.tx * soplo, z: ejesLadera.tz * soplo }, rafaga.intensidad, exterior);
+    nieve.actualizar(dtReal, mundo.camara.position, { x: ejesLadera.tx * soplo, z: ejesLadera.tz * soplo }, rafaga.intensidad, enCiudad ? 0 : exterior);
+    valencia.actualizar(performance.now() / 1000, mundo.camara.position);
     audio.actualizar(dtReal, mezcla, exterior);
     if (sala && lista && carrera) {
       carrera.pintar(alfa, dtReal, jugador, e.y);
@@ -420,11 +511,12 @@ const bucle = crearBucle({
       lista.actualizar([...sala.miembros(), ...carrera.delOrdenadorEnLista()], sala.yo.id, sala.anfitrion()?.id, alturas);
     }
 
-    mundo.pintar(pintado);
+    // Las luces (y la caja de las sombras) siguen al escalador o, volando, a la avioneta.
+    mundo.pintar(pose ?? pintado);
     fps.contar(dtReal);
     panel.actualizar(dtReal, { semilla, altura: e.y, postura: e.postura });
     // Los fragmentos son por tramo (3 en cada uno): se cuentan los del tramo en el que estás.
-    const enTramo = tramoEnAltura(e.y);
+    const enTramo = tramoEnAltura(e.y, enCiudad);
     hud.actualizar({
       vida: partida.vida,
       altura: e.y,
@@ -468,6 +560,20 @@ Object.assign(window, {
       const p = aMundo(ladera, 9.5, 0);
       Object.assign(jugador.escalador, { x: p.x, y: BASE_LADERA + 0.5, z: p.z, vx: 0, vy: 0, vz: 0, enSuelo: false });
       Object.assign(anterior, { x: p.x, y: BASE_LADERA + 0.5, z: p.z });
+    },
+    /** Pone al escalador en la cima, junto al borde, delante de la bandera (la avioneta, a unos pasos). */
+    irALaCima() {
+      const p = aMundo(ladera, dCara(CIMA) + 1.5, 4);
+      Object.assign(jugador.escalador, { x: p.x, y: CIMA, z: p.z, vx: 0, vy: 0, vz: 0, enSuelo: true });
+      Object.assign(anterior, { x: p.x, y: CIMA, z: p.z });
+    },
+    /** Sube a la avioneta de la cima sin ir hasta ella (para probar la escena; `desde`: en ese segundo). */
+    volar(desde = 0) {
+      if (viaje.estado === 'montana') viaje.empezar(desde);
+    },
+    /** El viaje: dónde está la avioneta (`montana`, `volando` o `valencia`). */
+    get viaje() {
+      return viaje.estado;
     },
     /** Sonido: si el navegador ya lo deja sonar («running») y si está silenciado. */
     get sonido() {

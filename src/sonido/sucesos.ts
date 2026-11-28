@@ -37,6 +37,8 @@ export const SONIDOS = [
   'pasoNieve',
   'graznido',
   'rafaga',
+  'puerta',
+  'ruedas',
 ] as const;
 
 export type Sonido = (typeof SONIDOS)[number];

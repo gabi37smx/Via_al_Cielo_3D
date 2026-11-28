@@ -21,13 +21,13 @@ src/
   config.ts  TODOS los números que se ajustan jugando (velocidades, saltos, cámara…)
   nucleo/    bucle de paso fijo, entrada (teclado/ratón/mando → una misma estructura)
   jugador/   control.ts (movimiento, LÓGICA PURA) y personaje.ts (dibujo y animación)
-  reglas/    torre (el pozo), ladera (la montaña y el límite del mundo), aire (águilas y viento), partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
+  reglas/    torre (el pozo), ladera (la montaña y el límite del mundo), aire (águilas y viento), vuelo (la avioneta de la cima), valencia (la ciudad), partida (vida, fragmentos, murciélagos), carrera… LÓGICA PURA: sin Three.js, sin DOM, sin red
   bots/      cerebro del escalador del ordenador y simulación de partidas (lógica pura)
-  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts, grieta.ts, adornos.ts, montana.ts y aire.ts (águilas, nieve y viento) (Three.js)
+  mundo/     escena (luces y ambiente de cada escenario), cámara, torre, cueva.ts, grieta.ts, adornos.ts, montana.ts, aire.ts (águilas, nieve y viento), avioneta.ts (la avioneta y el aeródromo) y valencia.ts (la Ciudad de las Artes) (Three.js)
   fisicas/   mundo Rapier, cápsula del escalador
   red/       protocolo.ts e interpolacion.ts (LÓGICA PURA) y sala.ts (Supabase)
   sonido/    sucesos.ts (qué suena en cada paso, LÓGICA PURA), sintetizador.ts (cómo suena, Web Audio) y audio.ts (volumen, M, fondo)
-  modos/     cada modo de juego une reglas, red y pantalla (carrera.ts: la carrera en una sala)
+  modos/     cada modo de juego une reglas, red y pantalla (carrera.ts: la carrera en una sala; viaje.ts: el vuelo de la cima a Valencia)
   ui/        menús, HUD, ranking, contador de fps
 public/modelos/ escalador.glb y escaladora.glb (Kenney, CC0) y su textura
 herramientas/  captura.mjs, simular.ts, prueba-red.mjs, sonidos.mjs
@@ -53,9 +53,9 @@ docs/          diseno.md, creditos.md, sesiones/
 | `npm run sonidos` | Graba cada sonido del juego en `capturas/sonidos/*.wav` (con el mismo código del juego) y enseña su duración, pico y volumen. Falla si alguno sale mudo, saturado o cortado. **Después de tocar `src/sonido/sintetizador.ts`, pásalo** (la IA no puede oír: lo mide) |
 | `npm run desplegar` | *Pendiente*: subir `dist/` al servidor del centro (falta saber cómo) |
 
-Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (empieza en el primer saliente desde esa altura), `?aspecto=escaladora` (o `escalador`; sin él, el último elegido en el menú), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla, altura y postura).
+Parámetros de la dirección del juego: `?semilla=N` (torre concreta), `?altura=M` (empieza en el primer saliente desde esa altura; `660` = en la cima, junto a la avioneta), `?valencia=1` (empieza ya en Valencia, al bajar de la avioneta), `?aspecto=escaladora` (o `escalador`; sin él, el último elegido en el menú), `?panel=1` (panel de datos, también con **F3**: llamadas de dibujo, triángulos, semilla, altura y postura).
 
-- En la consola del navegador (y en la captura con `--js "…"`) está `juego`: `juego.partida`, `juego.escalador`, `juego.sonido` (`running` = ya suena; antes del primer clic o tecla es `sin crear`), `juego.girarCamara(giro, inclinacion)` (rad, para capturas), `juego.irAlPasillo()` (dentro de la grieta, delante del pasillo de salida), `juego.danar(50)`, `juego.teletransportar(x, y, z)`, `juego.red`, `juego.carrera` y `juego.empezarCarrera()` (el anfitrión).
+- En la consola del navegador (y en la captura con `--js "…"`) está `juego`: `juego.partida`, `juego.escalador`, `juego.sonido` (`running` = ya suena; antes del primer clic o tecla es `sin crear`), `juego.girarCamara(giro, inclinacion)` (rad, para capturas), `juego.irAlPasillo()` (dentro de la grieta, delante del pasillo de salida), `juego.irALaCima()`, `juego.volar()` (sube a la avioneta; `juego.volar(9)` empieza la escena en el segundo 9, para capturas con `--js`), `juego.viaje` (`montana`, `volando` o `valencia`), `juego.danar(50)`, `juego.teletransportar(x, y, z)`, `juego.red`, `juego.carrera` y `juego.empezarCarrera()` (el anfitrión).
 - Con `?sala=` la captura se da por lista en cuanto sale «Conectando…»: para pulsar algo en la sala de espera, espera antes (`--teclas "_:5000,Enter:60"`).
 - Las pulsaciones (saltar) solo valen en el paso en que se leen; los números van a `src/config.ts`, nunca sueltos por el código.
 - SwiftShader (la captura) va a 5-10 fps: el juego va «a cámara lenta» porque el bucle no recupera más de 5 pasos por fotograma. No sirve para medir rendimiento. Para mirar otra zona: `npm run captura -- --ruta "?semilla=1&altura=110&panel=1" --salida capturas/alto.png` (la grieta empieza en `altura=220`; con `altura=440` se empieza en la explanada de la montaña, a la salida del pasillo).

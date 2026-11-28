@@ -160,6 +160,57 @@ body {
   to { opacity: 0; }
 }
 
+/* ---------- El vuelo a Valencia (I9) ---------- */
+
+#vuelo {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#vuelo[hidden] {
+  display: none;
+}
+
+.vuelo-banda {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 11vh;
+  background: #000;
+  display: flex;
+  align-items: center;
+  padding: 0 4vw;
+  color: #e6edf3;
+  font: 600 clamp(14px, 2.2vh, 22px)/1.2 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  transition: transform 0.6s ease-out;
+}
+
+.vuelo-arriba {
+  top: 0;
+  transform: translateY(-100%);
+}
+
+.vuelo-abajo {
+  bottom: 0;
+  justify-content: center; /* a la derecha están los botones de sonido y pantalla completa */
+  color: #9fb3c8;
+  font-weight: 400;
+  transform: translateY(100%);
+}
+
+#vuelo.abierto .vuelo-banda {
+  transform: translateY(0);
+}
+
+.vuelo-blanco {
+  position: absolute;
+  inset: 0;
+  background: #f4f8fb;
+  opacity: 0;
+}
+
 /* ---------- Fin de partida ---------- */
 
 #fin {
